@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getSessionFromRequest, getAccountById } from '@queue-platform/api/src/server';
+import { getSessionFromRequest } from '@queue-platform/api/src/auth';
+import { getAccountById } from '@queue-platform/api/src/db';
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });

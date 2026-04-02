@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { findAdminByEmail, findAccountByEmail, hashPassword, createSession, setSessionCookie } from '@queue-platform/api/src/server';
+import { findAdminByEmail, findAccountByEmail, hashPassword } from '@queue-platform/api/src/db';
+import { createSessionToken, setSessionCookie } from '@queue-platform/api/src/auth';
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -11,20 +12,20 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
 
   const admin = findAdminByEmail(email);
   if (admin && admin.passwordHash === pwHash) {
-    const session = createSession(admin.id, 'SUPER_ADMIN');
-    setSessionCookie(res, session.id);
+    const token = createSessionToken(admin.id, 'SUPER_ADMIN');
+    setSessionCookie(res, token);
     return res.status(200).json({
-      sessionId: session.id,
+      sessionId: token,
       user: { id: admin.id, email: admin.email, role: 'SUPER_ADMIN' },
     });
   }
 
   const account = findAccountByEmail(email);
   if (account && account.passwordHash === pwHash && account.status === 'ACTIVE') {
-    const session = createSession(account.id, 'STORE_ADMIN', account.id);
-    setSessionCookie(res, session.id);
+    const token = createSessionToken(account.id, 'STORE_ADMIN', account.id);
+    setSessionCookie(res, token);
     return res.status(200).json({
-      sessionId: session.id,
+      sessionId: token,
       user: { id: account.id, email: account.email, role: 'STORE_ADMIN', storeName: account.storeName, storeId: account.id },
     });
   }

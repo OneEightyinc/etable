@@ -9,9 +9,6 @@ export {
   hashPassword,
   findAdminByEmail,
   findAccountByEmail,
-  createSession,
-  findSession,
-  deleteSession,
   getAllAccounts,
   getAccountById,
   createAccount,
@@ -35,17 +32,19 @@ export type {
   AdminUser,
   Account,
   QueueEntry,
-  Session,
   StoreSettings,
 } from './db';
 
 // Auth middleware
 export {
   getSessionFromRequest,
+  createSessionToken,
   setSessionCookie,
   clearSessionCookie,
   requireAuth,
 } from './auth';
+
+export type { Session } from './auth';
 
 // SSE event bus
 export {

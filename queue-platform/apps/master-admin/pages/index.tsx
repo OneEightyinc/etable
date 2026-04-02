@@ -11,7 +11,7 @@ const MasterAdminPage: NextPage = () => {
   useEffect(() => {
     getMe()
       .then((user) => {
-        if (user.role === "SUPER_ADMIN") setIsLoggedIn(true);
+        if (user?.role === "SUPER_ADMIN") setIsLoggedIn(true);
       })
       .catch(() => {})
       .finally(() => setIsChecking(false));

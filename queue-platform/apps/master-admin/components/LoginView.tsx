@@ -1,6 +1,5 @@
 
 import React, { useState } from 'react';
-import Image from 'next/image';
 import GlassModal from './GlassModal';
 import { login } from '@queue-platform/api';
 
@@ -44,13 +43,7 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
         {/* Logo Area - CIRCLX Style */}
         <div className="flex flex-col items-center mb-10 text-center">
           <div className="select-none">
-            <Image
-              src="/circlx_black.svg"
-              alt="CIRCLX"
-              width={240}
-              height={80}
-              priority
-            />
+            <img src="/circlx_black.svg" alt="CIRCLX" width={240} height={80} className="h-20 w-[240px]" />
           </div>
           <p className="mt-5 text-[10px] font-avenir font-bold uppercase tracking-[0.4em] text-slate-400">
             MANAGEMENT SYSTEM

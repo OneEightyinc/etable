@@ -7,6 +7,7 @@ const BASE = '/api';
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${url}`, {
+    credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     ...options,
   });
@@ -42,8 +43,17 @@ export async function logout(): Promise<void> {
   await request('/auth/logout', { method: 'POST' });
 }
 
-export async function getMe(): Promise<LoginResponse['user']> {
-  const data = await request<{ user: LoginResponse['user'] }>('/auth/me');
+export async function getMe(): Promise<LoginResponse['user'] | null> {
+  const res = await fetch(`${BASE}/auth/me`, {
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (res.status === 401) return null;
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: 'Unknown error' }));
+    throw new Error(body.error || `HTTP ${res.status}`);
+  }
+  const data = (await res.json()) as { user: LoginResponse['user'] };
   return data.user;
 }
 

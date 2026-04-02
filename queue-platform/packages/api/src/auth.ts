@@ -57,6 +57,14 @@ export interface Session {
   createdAt: string;
 }
 
+function decodeCookieValue(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
 export function getSessionFromRequest(req: NextApiRequest): Session | undefined {
   const cookies = req.headers.cookie
     ?.split(';')
@@ -66,8 +74,9 @@ export function getSessionFromRequest(req: NextApiRequest): Session | undefined 
       return acc;
     }, {} as Record<string, string>);
 
-  const token = cookies?.[SESSION_COOKIE] || req.headers.authorization?.replace('Bearer ', '');
-  if (!token) return undefined;
+  const raw = cookies?.[SESSION_COOKIE] || req.headers.authorization?.replace('Bearer ', '');
+  if (!raw) return undefined;
+  const token = decodeCookieValue(raw);
 
   const payload = verifyToken(token);
   if (!payload) return undefined;
@@ -93,17 +102,24 @@ export function createSessionToken(userId: string, role: 'SUPER_ADMIN' | 'STORE_
   return signToken(payload);
 }
 
+function isProductionDeployment(): boolean {
+  return process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
+}
+
 export function setSessionCookie(res: NextApiResponse, token: string): void {
+  const secure = isProductionDeployment() ? '; Secure' : '';
+  const value = encodeURIComponent(token);
   res.setHeader(
     'Set-Cookie',
-    `${SESSION_COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${TOKEN_MAX_AGE}`
+    `${SESSION_COOKIE}=${value}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${TOKEN_MAX_AGE}${secure}`
   );
 }
 
 export function clearSessionCookie(res: NextApiResponse): void {
+  const secure = isProductionDeployment() ? '; Secure' : '';
   res.setHeader(
     'Set-Cookie',
-    `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`
+    `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure}`
   );
 }
 

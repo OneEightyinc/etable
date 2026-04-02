@@ -82,6 +82,12 @@ function getDbPath(): string {
 
   // Check if we're inside apps/ directory
   if (process.cwd().includes('/apps/')) {
+    if (fs.existsSync(monorepoPath)) return monorepoPath;
+  }
+  if (fs.existsSync(cwdPath)) return cwdPath;
+
+  // Fallback: try monorepo path first, then cwd path
+  if (process.cwd().includes('/apps/')) {
     return monorepoPath;
   }
   return cwdPath;
@@ -155,23 +161,29 @@ function loadDb(): Database {
       globalForDb._queueDb = JSON.parse(raw) as Database;
     } else {
       globalForDb._queueDb = getDefaultDb();
-      saveDb();
+      saveDb(); // will silently skip on read-only filesystems
     }
   } catch {
     globalForDb._queueDb = getDefaultDb();
-    saveDb();
+    // Don't call saveDb() here – if we can't read, we likely can't write either
   }
 
   return globalForDb._queueDb!;
 }
 
 function saveDb(): void {
-  const dbPath = getDbPath();
-  const dir = path.dirname(dbPath);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+  try {
+    const dbPath = getDbPath();
+    const dir = path.dirname(dbPath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    fs.writeFileSync(dbPath, JSON.stringify(globalForDb._queueDb, null, 2), 'utf-8');
+  } catch {
+    // On read-only filesystems (e.g. Vercel), silently skip file writes.
+    // Data is still held in the in-memory cache (globalForDb._queueDb).
+    console.warn('[db] saveDb skipped – filesystem is read-only');
   }
-  fs.writeFileSync(dbPath, JSON.stringify(globalForDb._queueDb, null, 2), 'utf-8');
 }
 
 // ─── Admin / Auth ────────────────────────────────────────

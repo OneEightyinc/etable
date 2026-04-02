@@ -94,7 +94,8 @@ function getDbPath(): string {
 }
 
 export function hashPassword(password: string): string {
-  return crypto.createHash('sha256').update(password).digest('hex');
+  const p = password ?? '';
+  return crypto.createHash('sha256').update(p, 'utf8').digest('hex');
 }
 
 function getDefaultDb(): Database {
@@ -147,6 +148,29 @@ function getDefaultDb(): Database {
   };
 }
 
+/**
+ * Vercel 等で空・部分だけの db.json や壊れた JSON があると、
+ * `admins` が無くて find が落ちて API が 500 になる。必ず配列を保証する。
+ */
+function normalizeDatabase(raw: unknown): Database {
+  const defaults = getDefaultDb();
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return defaults;
+  }
+  const d = raw as Record<string, unknown>;
+  return {
+    admins: Array.isArray(d.admins) ? (d.admins as AdminUser[]) : [...defaults.admins],
+    accounts: Array.isArray(d.accounts) ? (d.accounts as Account[]) : [...defaults.accounts],
+    queue: Array.isArray(d.queue) ? (d.queue as QueueEntry[]) : [],
+    sessions: Array.isArray(d.sessions) ? (d.sessions as Session[]) : [],
+    counters:
+      d.counters && typeof d.counters === 'object' && !Array.isArray(d.counters)
+        ? (d.counters as Record<string, number>)
+        : {},
+    storeSettings: Array.isArray(d.storeSettings) ? (d.storeSettings as StoreSettings[]) : [],
+  };
+}
+
 // ─── In-memory cache ─────────────────────────────────────
 const globalForDb = globalThis as unknown as { _queueDb?: Database };
 
@@ -158,7 +182,8 @@ function loadDb(): Database {
   try {
     if (fs.existsSync(dbPath)) {
       const raw = fs.readFileSync(dbPath, 'utf-8');
-      globalForDb._queueDb = JSON.parse(raw) as Database;
+      const parsed = JSON.parse(raw) as unknown;
+      globalForDb._queueDb = normalizeDatabase(parsed);
     } else {
       globalForDb._queueDb = getDefaultDb();
       saveDb(); // will silently skip on read-only filesystems

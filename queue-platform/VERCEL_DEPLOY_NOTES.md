@@ -33,6 +33,13 @@
 
 **`apps/master-admin/next.config.ts`**
 - `outputFileTracingRoot` / `turbopack.root` を `queue-platform` ルートに設定（`@queue-platform/api` をサーバーレスに正しく含める）
+- `outputFileTracingIncludes` で `/api/**/*` に `packages/api/src` を明示同梱（ログイン API の実行時 500 対策）
+
+**`packages/api/src/db.ts`**
+- `normalizeDatabase()` — 読み込んだ JSON に `admins` 等が無い場合でも落ちずデフォルトで補完（Vercel 上の空/壊れた `db.json` での 500 防止）
+
+**`apps/master-admin/pages/api/auth/login.ts`**
+- `req.body` の型ゆれ（未パース文字列等）に対応、`try/catch` で 500 を JSON に集約、`console.error` で Vercel ログ確認可能に
 
 **`packages/api/src/auth.ts`**
 - 本番（`NODE_ENV=production` または `VERCEL=1`）ではセッション Cookie に **`Secure`** を付与

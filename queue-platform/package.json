@@ -1,0 +1,16 @@
+{
+  "name": "queue-platform",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:store": "npm run dev -w apps/store-admin",
+    "dev:customer": "npm run dev -w apps/customer-portal",
+    "dev:kiosk": "npm run dev -w apps/kiosk",
+    "dev:master": "npm run dev -w apps/master-admin",
+    "dev:all": "npm run dev:store & npm run dev:customer & npm run dev:kiosk & npm run dev:master"
+  }
+}

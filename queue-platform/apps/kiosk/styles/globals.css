@@ -1,0 +1,120 @@
+@import "tailwindcss";
+
+@theme {
+  --color-kioskBlue: #082752;
+  --color-kioskOrange: #FF8100;
+  --color-kioskOrangeHover: #e36a0d;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family:
+    Inter,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Helvetica Neue",
+    Arial,
+    "Noto Sans JP",
+    sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* tablet/index.html 由来 */
+.text-input {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.keypad button,
+#people-keypad button {
+  font-family: "Helvetica Neue", "Helvetica", "Arial", sans-serif !important;
+}
+
+.time-estimate {
+  background-color: transparent;
+  color: #ffffff;
+}
+
+.phone-number-input {
+  font-family: "Helvetica Neue", "Helvetica", "Arial", sans-serif !important;
+  font-weight: 400;
+  font-size: 14px;
+  letter-spacing: 2px;
+  color: #b0b0b0;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.keypad-button {
+  font-family: "Helvetica Neue", "Helvetica", "Arial", sans-serif !important;
+}
+
+.entry-number {
+  font-family: "Helvetica Neue", "Helvetica", "Arial", sans-serif !important;
+  font-size: 168px;
+  line-height: 128px;
+  font-weight: 900;
+  letter-spacing: -3px;
+}
+
+@media (max-width: 1024px) {
+  .entry-number {
+    font-size: 120px;
+    line-height: 96px;
+  }
+  .complete-main-title {
+    font-size: 22px;
+  }
+  .complete-sub-text {
+    font-size: 16px;
+  }
+  .complete-call-text {
+    font-size: 20px;
+  }
+  .wait-pill-text {
+    font-size: 16px;
+  }
+  .keypad button,
+  #people-keypad button {
+    height: 56px !important;
+    font-size: 22px !important;
+  }
+}
+
+.complete-main-title {
+  font-size: 26px;
+  line-height: 1.5;
+}
+
+.complete-sub-text {
+  font-size: 18px;
+  line-height: 26px;
+}
+
+.complete-call-text {
+  font-size: 24px;
+  line-height: 32px;
+}
+
+.wait-pill-text {
+  font-size: 18px;
+  line-height: 26px;
+}
+
+.agree-button {
+  background-color: #ff8100;
+}
+
+.notice-back-button {
+  background-color: #f0f0f0;
+}

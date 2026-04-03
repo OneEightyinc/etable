@@ -34,8 +34,12 @@ function fmtTimer(min: number) {
 }
 
 /* ─── component ─── */
-const StoreView: React.FC<{ storeId?: string }> = ({ storeId = 'shibuya-001' }) => {
+const StoreView: React.FC<{ storeId?: string }> = ({ storeId: storeIdProp }) => {
   const router = useRouter();
+  const storeId =
+    (router.isReady && typeof router.query.storeId === 'string' && router.query.storeId) ||
+    storeIdProp ||
+    'shibuya-001';
   const [customers, setCustomers] = useState<QueueEntryData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -416,11 +420,11 @@ const StoreView: React.FC<{ storeId?: string }> = ({ storeId = 'shibuya-001' }) 
               <div className="mb-6">
                 <p className="text-xs text-gray-400 tracking-widest mb-3">ANALYSIS &amp; REPORTS</p>
                 <div className="space-y-2">
-                  <Link href="/analytics" className="w-full flex items-center gap-3 px-4 py-3.5 bg-[#082752] text-white rounded-xl hover:bg-[#0a3060] transition-colors">
+                  <Link href={`/analytics?storeId=${encodeURIComponent(storeId)}`} className="w-full flex items-center gap-3 px-4 py-3.5 bg-[#082752] text-white rounded-xl hover:bg-[#0a3060] transition-colors">
                     <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 3v18h18" /><path d="M7 13l3-3 4 4 5-5" /></svg>
                     <span className="font-medium">分析・ダッシュボード</span>
                   </Link>
-                  <Link href="/reviews" className="w-full flex items-center gap-3 px-4 py-3.5 bg-white border-2 border-[#082752] text-[#082752] rounded-xl hover:bg-gray-50 transition-colors">
+                  <Link href={`/reviews?storeId=${encodeURIComponent(storeId)}`} className="w-full flex items-center gap-3 px-4 py-3.5 bg-white border-2 border-[#082752] text-[#082752] rounded-xl hover:bg-gray-50 transition-colors">
                     <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>
                     <span className="font-medium">レビュー分析</span>
                   </Link>
@@ -431,11 +435,11 @@ const StoreView: React.FC<{ storeId?: string }> = ({ storeId = 'shibuya-001' }) 
               <div className="mb-6">
                 <p className="text-xs text-gray-400 tracking-widest mb-3">MENU</p>
                 <div className="space-y-2">
-                  <Link href="/history" className="w-full flex items-center gap-3 px-4 py-3.5 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+                  <Link href={`/history?storeId=${encodeURIComponent(storeId)}`} className="w-full flex items-center gap-3 px-4 py-3.5 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
                     <svg className="w-5 h-5 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
                     <span className="font-medium text-[#082752]">案内・キャンセル履歴</span>
                   </Link>
-                  <Link href="/settings" className="w-full flex items-center gap-3 px-4 py-3.5 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+                  <Link href={`/settings?storeId=${encodeURIComponent(storeId)}`} className="w-full flex items-center gap-3 px-4 py-3.5 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
                     <svg className="w-5 h-5 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 00.33 1.82l0 0a2 2 0 11-2.83 2.83l0 0A1.65 1.65 0 0015 19.4a1.65 1.65 0 00-1 1.13v0a2 2 0 01-4 0v0A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l0 0a2 2 0 11-2.83-2.83l0 0A1.65 1.65 0 004.6 15a1.65 1.65 0 00-1.13-1v0a2 2 0 010-4v0A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l0 0a2 2 0 112.83-2.83l0 0A1.65 1.65 0 009 4.6a1.65 1.65 0 001-1.13v0a2 2 0 014 0v0A1.65 1.65 0 0015 4.6a1.65 1.65 0 001.82-.33l0 0a2 2 0 112.83 2.83l0 0A1.65 1.65 0 0019.4 9a1.65 1.65 0 00.33 1.82v0a2 2 0 010 4v0z" /></svg>
                     <span className="font-medium text-[#082752]">詳細設定</span>
                   </Link>

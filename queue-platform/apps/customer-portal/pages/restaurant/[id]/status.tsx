@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
-import Image from "next/image";
 import BottomNavigation from "../../../components/common/BottomNavigation";
 import {
   getReservations,
@@ -9,15 +8,10 @@ import {
   updateReservationWait,
   type ReservationItem,
 } from "../../../lib/storage";
-import { restaurants } from "../../../data/restaurants";
+import { useRestaurantById } from "../../../lib/useRestaurantById";
 
 const POSTPONE_GROUPS = 3;
 const POSTPONE_MINUTES = 12;
-
-const nearbySpots = [
-  { id: "cafe-1", name: "コーヒースタンド夏", category: "カフェ", distance: "徒歩2分", imageUrl: "https://picsum.photos/seed/cafe1/100/100" },
-  { id: "sweets-1", name: "スイーツ専門バル", category: "洋食", distance: "徒歩5分", imageUrl: "https://picsum.photos/seed/sweets1/100/100" },
-];
 
 /* ---------- Inline SVG Icons ---------- */
 const ChevronLeftIcon = () => (
@@ -85,7 +79,9 @@ function Modal({ title, confirmText, onClose, onConfirm, confirmColor, children 
 /* ---------- Main Page ---------- */
 const ReservationStatusPage: React.FC = () => {
   const router = useRouter();
-  const { id: restaurantId } = router.query as { id: string };
+  const rid = router.query.id;
+  const restaurantId = typeof rid === "string" ? rid : undefined;
+  const { restaurant } = useRestaurantById(restaurantId);
 
   const [reservation, setReservation] = useState<ReservationItem | null>(null);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
@@ -94,8 +90,6 @@ const ReservationStatusPage: React.FC = () => {
   const [isLineModalOpen, setIsLineModalOpen] = useState(false);
   const [notificationMethod, setNotificationMethod] = useState<"未設定" | "メール" | "LINE">("未設定");
   const [emailInput, setEmailInput] = useState("");
-
-  const restaurant = restaurants.find((r) => r.id === restaurantId);
 
   useEffect(() => {
     if (!restaurantId) return;
@@ -139,7 +133,10 @@ const ReservationStatusPage: React.FC = () => {
   };
 
   const handleRouteGuide = () => {
-    if (!restaurant) return;
+    if (!restaurant?.address?.trim()) {
+      alert("住所が設定されていません");
+      return;
+    }
     window.open(
       `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(restaurant.address)}`,
       "_blank"
@@ -322,35 +319,10 @@ const ReservationStatusPage: React.FC = () => {
             </div>
           </section>
 
-          {/* Nearby Spots */}
-          <section>
-            <div className="mb-3 flex items-center gap-2">
-              <MapPinIcon className="text-[#ff6b00]" />
-              <h2 className="text-[18px] font-bold text-[#111827]">近くで時間をつぶす</h2>
-            </div>
-            <div className="space-y-3">
-              {nearbySpots.map((spot) => (
-                <div
-                  key={spot.id}
-                  className="flex w-full items-center justify-between rounded-[20px] border border-[#ececec] bg-white px-4 py-4 shadow-[0_4px_12px_rgba(0,0,0,0.05)]"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-[14px] bg-[#f0f0f0]">
-                      <Image src={spot.imageUrl} alt={spot.name} fill className="object-cover" sizes="56px" />
-                    </div>
-                    <div className="text-left">
-                      <p className="text-[12px] font-medium text-[#98a2b3]">{spot.category}</p>
-                      <p className="text-[16px] font-bold text-[#1f2937]">{spot.name}</p>
-                      <p className="mt-0.5 flex items-center gap-1 text-[13px] text-[#98a2b3]">
-                        <MapPinIcon className="text-[#98a2b3]" />
-                        {spot.distance}
-                      </p>
-                    </div>
-                  </div>
-                  <ChevronRightIcon />
-                </div>
-              ))}
-            </div>
+          <section className="rounded-[20px] border border-[#ececec] bg-[#fafafa] px-4 py-4">
+            <p className="text-center text-[13px] leading-relaxed text-[#6b7280]">
+              周辺のおすすめスポットは現在表示していません。
+            </p>
           </section>
         </div>
 

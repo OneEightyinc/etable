@@ -26,6 +26,11 @@ export {
   restoreQueueEntry,
   getStoreSettings,
   updateStoreSettings,
+  getStorePortalProfile,
+  getCustomerProfileById,
+  createCustomerProfile,
+  updateCustomerProfile,
+  deleteCustomerProfile,
 } from './db';
 
 export type {
@@ -33,6 +38,8 @@ export type {
   Account,
   QueueEntry,
   StoreSettings,
+  StorePortalProfile,
+  CustomerProfileRecord,
 } from './db';
 
 // Auth middleware
@@ -45,6 +52,12 @@ export {
 } from './auth';
 
 export type { Session } from './auth';
+
+export {
+  getCustomerIdFromRequest,
+  setCustomerCookie,
+  clearCustomerCookie,
+} from './customerAuth';
 
 // SSE event bus
 export {

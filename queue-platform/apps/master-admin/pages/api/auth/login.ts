@@ -18,7 +18,7 @@ function parseBody(req: NextApiRequest): { email?: string; password?: string } {
   return {};
 }
 
-export default function handler(req: NextApiRequest, res: NextApiResponse) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -34,7 +34,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
 
     const pwHash = hashPassword(password);
 
-    const admin = findAdminByEmail(email);
+    const admin = await findAdminByEmail(email);
     if (admin && admin.passwordHash === pwHash) {
       const token = createSessionToken(admin.id, "SUPER_ADMIN");
       setSessionCookie(res, token);
@@ -44,7 +44,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
       });
     }
 
-    const account = findAccountByEmail(email);
+    const account = await findAccountByEmail(email);
     if (account && account.passwordHash === pwHash && account.status === "ACTIVE") {
       const token = createSessionToken(account.id, "STORE_ADMIN", account.id);
       setSessionCookie(res, token);

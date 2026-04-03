@@ -1,25 +1,32 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import AppHeader from "../components/common/AppHeader";
 import BottomNavigation from "../components/common/BottomNavigation";
 import { getReservations, type ReservationItem } from "../lib/storage";
-import { restaurants } from "../data/restaurants";
+import { fetchPortalRestaurant } from "../lib/portalRestaurant";
+import { RESTAURANT_IMAGE_PLACEHOLDER } from "../lib/placeholders";
 
 const MyReservations: React.FC = () => {
   const [reservations, setReservations] = useState<ReservationItem[]>([]);
   const [isClient, setIsClient] = useState(false);
+  const [images, setImages] = useState<Record<string, string>>({});
 
   useEffect(() => {
     setIsClient(true);
     const resvs = getReservations().filter((r) => r.status === "waiting");
     setReservations(resvs);
+    (async () => {
+      const m: Record<string, string> = {};
+      const ids = [...new Set(resvs.map((r) => r.restaurantId))];
+      await Promise.all(
+        ids.map(async (id) => {
+          const rest = await fetchPortalRestaurant(id);
+          m[id] = rest?.imageUrl ?? RESTAURANT_IMAGE_PLACEHOLDER;
+        })
+      );
+      setImages(m);
+    })();
   }, []);
-
-  const getRestaurantImage = (restaurantId: string): string => {
-    const restaurant = restaurants.find((r) => r.id === restaurantId);
-    return restaurant?.imageUrl || "https://via.placeholder.com/96x120";
-  };
 
   if (!isClient) {
     return (
@@ -38,14 +45,17 @@ const MyReservations: React.FC = () => {
       <AppHeader />
       <main className="flex-grow pt-16 pb-24">
         <div className="mx-auto w-full max-w-[393px] bg-white px-4 py-4">
-          <h1 className="text-[18px] font-bold text-[#222] mb-6">マイ予約</h1>
+          <h1 className="mb-6 text-[18px] font-bold text-[#222]">マイ予約</h1>
 
           {reservations.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 space-y-4">
+            <div className="flex flex-col items-center justify-center space-y-4 py-16">
               <p className="text-[14px] text-[#999]">まだ予約はありません</p>
               <Link href="/">
-                <button className="bg-[#FD780F] hover:bg-[#ff6b00] text-white font-bold py-2 px-6 rounded-lg transition-colors text-[14px]">
-                  お店を探す
+                <button
+                  type="button"
+                  className="rounded-lg bg-[#FD780F] px-6 py-2 text-[14px] font-bold text-white transition-colors hover:bg-[#ff6b00]"
+                >
+                  トップへ
                 </button>
               </Link>
             </div>
@@ -54,40 +64,35 @@ const MyReservations: React.FC = () => {
               {reservations.map((reservation) => (
                 <div
                   key={reservation.id}
-                  className="flex gap-3 p-4 bg-white border border-gray-200 rounded-lg"
+                  className="flex gap-3 rounded-lg border border-gray-200 bg-white p-4"
                 >
-                  {/* Image */}
-                  <div className="relative w-20 h-24 flex-shrink-0">
-                    <Image
-                      src={getRestaurantImage(reservation.restaurantId)}
+                  <div className="relative h-24 w-20 shrink-0 overflow-hidden rounded">
+                    <img
+                      src={images[reservation.restaurantId] ?? RESTAURANT_IMAGE_PLACEHOLDER}
                       alt={reservation.restaurantName}
                       width={80}
                       height={96}
-                      className="w-20 h-24 object-cover rounded"
+                      className="h-24 w-20 object-cover"
                     />
-                    <div className="absolute top-2 right-2 bg-[#FD780F] text-white text-[10px] font-bold px-2 py-1 rounded">
+                    <div className="absolute right-2 top-2 rounded bg-[#FD780F] px-2 py-1 text-[10px] font-bold text-white">
                       順番待ち
                     </div>
                   </div>
 
-                  {/* Info */}
-                  <div className="flex-1 flex flex-col justify-between">
+                  <div className="flex flex-1 flex-col justify-between">
                     <div>
-                      <h3 className="text-[13px] font-bold text-[#222] line-clamp-2 mb-2">
+                      <h3 className="mb-2 line-clamp-2 text-[13px] font-bold text-[#222]">
                         {reservation.restaurantName}
                       </h3>
-                      <p className="text-[12px] text-[#666] mb-1">
-                        チケット番号: <span className="font-bold text-[#222]">#{reservation.ticketNumber}</span>
+                      <p className="mb-1 text-[12px] text-[#666]">
+                        チケット番号:{" "}
+                        <span className="font-bold text-[#222]">#{reservation.ticketNumber}</span>
                       </p>
                     </div>
 
                     <div className="space-y-1">
-                      <p className="text-[12px] text-[#999]">
-                        {reservation.waitingGroups}組待ち中
-                      </p>
-                      <p className="text-[12px] font-bold text-[#FD780F]">
-                        約{reservation.waitMinutes}分
-                      </p>
+                      <p className="text-[12px] text-[#999]">{reservation.waitingGroups}組待ち中</p>
+                      <p className="text-[12px] font-bold text-[#FD780F]">約{reservation.waitMinutes}分</p>
                     </div>
                   </div>
                 </div>

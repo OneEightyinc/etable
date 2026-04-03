@@ -2,8 +2,8 @@ import React, { useState } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
 import { addReservation } from "../../../lib/storage";
-import { restaurants } from "../../../data/restaurants";
 import BottomNavigation from "../../../components/common/BottomNavigation";
+import { useRestaurantById } from "../../../lib/useRestaurantById";
 
 const seatOptions = ["こだわりなし", "テーブル席", "カウンター"];
 
@@ -31,8 +31,9 @@ const ExclamationCircleIcon = () => (
 
 const ReservePage: React.FC = () => {
   const router = useRouter();
-  const { id: restaurantId } = router.query as { id: string };
-  const restaurant = restaurants.find((r) => r.id === restaurantId);
+  const rid = router.query.id;
+  const restaurantId = typeof rid === "string" ? rid : undefined;
+  const { restaurant, loading } = useRestaurantById(restaurantId);
 
   const [count, setCount] = useState(2);
   const [seatType, setSeatType] = useState("テーブル席");
@@ -61,7 +62,15 @@ const ReservePage: React.FC = () => {
     router.push(`/restaurant/${restaurantId}/status`);
   };
 
-  if (!restaurant) {
+  if (!router.isReady || (restaurantId && loading)) {
+    return (
+      <main className="mx-auto flex min-h-screen w-full max-w-[393px] items-center justify-center bg-white p-6">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#ff6b00] border-t-transparent" />
+      </main>
+    );
+  }
+
+  if (!restaurant || !restaurantId) {
     return (
       <main className="mx-auto min-h-screen w-full max-w-[393px] bg-white p-6">
         店舗情報が見つかりません

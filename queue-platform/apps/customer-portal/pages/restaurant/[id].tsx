@@ -1,38 +1,51 @@
 import React, { useState } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
-import Image from "next/image";
 import AppHeader from "../../components/common/AppHeader";
 import BottomNavigation from "../../components/common/BottomNavigation";
-import { restaurants } from "../../data/restaurants";
 import { getFavorites, addFavorite, removeFavorite } from "../../lib/storage";
+import { useRestaurantById } from "../../lib/useRestaurantById";
 
 type TabType = "detail" | "menu" | "reviews";
 
 const RestaurantDetail: React.FC = () => {
   const router = useRouter();
-  const { id } = router.query;
+  const id = router.query.id;
+  const idStr = typeof id === "string" ? id : undefined;
+  const { restaurant, loading } = useRestaurantById(idStr);
   const [activeTab, setActiveTab] = useState<TabType>("detail");
   const [isFavorited, setIsFavorited] = useState(false);
   const [isClient, setIsClient] = useState(false);
 
   React.useEffect(() => {
     setIsClient(true);
-    if (id) {
+    if (idStr) {
       const favorites = getFavorites();
-      setIsFavorited(favorites.some((f) => f.restaurantId === id));
+      setIsFavorited(favorites.some((f) => f.restaurantId === idStr));
     }
-  }, [id]);
+  }, [idStr]);
 
-  const restaurant = restaurants.find((r) => r.id === id);
+  if (!router.isReady || (idStr && loading)) {
+    return (
+      <>
+        <AppHeader />
+        <main className="flex-grow pt-16 pb-24">
+          <div className="mx-auto flex h-96 w-full max-w-[393px] items-center justify-center">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#FD780F] border-t-transparent" />
+          </div>
+        </main>
+        <BottomNavigation />
+      </>
+    );
+  }
 
   if (!restaurant) {
     return (
       <>
         <AppHeader />
         <main className="flex-grow pt-16 pb-24">
-          <div className="mx-auto w-full max-w-[393px] flex items-center justify-center h-96">
-            <p className="text-gray-500">Restaurant not found</p>
+          <div className="mx-auto flex h-96 w-full max-w-[393px] items-center justify-center px-4">
+            <p className="text-center text-gray-500">店舗が見つかりません</p>
           </div>
         </main>
         <BottomNavigation />
@@ -109,12 +122,11 @@ const RestaurantDetail: React.FC = () => {
       <main className="flex-grow pt-16 pb-24">
         <div className="mx-auto w-full max-w-[393px] bg-white">
           {/* Hero Image */}
-          <div className="relative w-full h-[248px] bg-gray-200">
-            <Image
+          <div className="relative h-[248px] w-full bg-gray-200">
+            <img
               src={restaurant.imageUrl}
               alt={restaurant.name}
-              fill
-              className="w-full h-full object-cover"
+              className="absolute inset-0 h-full w-full object-cover"
             />
             {/* Back Button */}
             <button
@@ -311,7 +323,7 @@ const RestaurantDetail: React.FC = () => {
       {/* Reservation Button */}
       <div className="fixed bottom-20 left-0 right-0 px-4 py-4 bg-white border-t border-gray-200">
         <div className="mx-auto w-full max-w-[393px]">
-          <Link href={`/restaurant/${id}/reserve`} className="block w-full bg-[#FD780F] hover:bg-[#ff6b00] text-white font-bold py-3 px-4 rounded-lg transition-colors text-center">
+          <Link href={`/restaurant/${restaurant.id}/reserve`} className="block w-full bg-[#FD780F] hover:bg-[#ff6b00] text-white font-bold py-3 px-4 rounded-lg transition-colors text-center">
             並ばずに順番待ち
           </Link>
         </div>

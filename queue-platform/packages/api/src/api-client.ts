@@ -173,6 +173,18 @@ export interface StoreSettingsData {
   callMessage: string;
   autoCancelMinutes: number;
   updatedAt: string;
+  portalDisplayName?: string;
+  portalCategory?: string;
+  portalImageUrl?: string;
+  portalTags?: string[];
+  portalDescription?: string;
+  portalAddress?: string;
+  portalDistanceLabel?: string;
+  portalRating?: number;
+  portalPriceRange?: string;
+  portalHoursSummary?: string;
+  portalMenuItems?: { name: string; price: string }[];
+  portalReviews?: { author: string; rating: number; comment: string }[];
 }
 
 export async function getStoreSettingsApi(storeId: string): Promise<StoreSettingsData> {

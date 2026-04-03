@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import Image from "next/image";
 
 interface RestaurantCardProps {
   restaurant: {
@@ -65,13 +64,13 @@ const RestaurantCard: React.FC<RestaurantCardProps> = ({
     <Link href={`/restaurant/${restaurant.id}`}>
       <div className="flex gap-3 p-4 bg-white border border-gray-200 rounded-lg hover:shadow-md transition-shadow cursor-pointer relative">
         {/* Image Container */}
-        <div className="relative w-24 h-30 flex-shrink-0">
-          <Image
+        <div className="relative w-24 h-[120px] flex-shrink-0">
+          <img
             src={restaurant.imageUrl}
             alt={restaurant.name}
             width={96}
             height={120}
-            className="w-24 h-30 object-cover rounded"
+            className="w-24 h-[120px] object-cover rounded"
           />
           {/* Waiting Groups Badge */}
           {restaurant.waitingGroups > 0 && (

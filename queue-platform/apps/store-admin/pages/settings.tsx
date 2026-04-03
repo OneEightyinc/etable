@@ -13,6 +13,11 @@ interface ClosedDay {
   day: string;
 }
 
+interface MenuRow {
+  name: string;
+  price: string;
+}
+
 interface StoreSettings {
   storeId: string;
   businessHours: BusinessHour[];
@@ -21,6 +26,18 @@ interface StoreSettings {
   isTodayException: boolean;
   callMessage: string;
   autoCancelMinutes: number;
+  portalDisplayName?: string;
+  portalCategory?: string;
+  portalImageUrl?: string;
+  portalTags?: string[];
+  portalDescription?: string;
+  portalAddress?: string;
+  portalDistanceLabel?: string;
+  portalRating?: number;
+  portalPriceRange?: string;
+  portalHoursSummary?: string;
+  portalMenuItems?: MenuRow[];
+  portalReviews?: { author: string; rating: number; comment: string }[];
 }
 
 export default function SettingsPage() {
@@ -33,6 +50,19 @@ export default function SettingsPage() {
   const [isTodayException, setIsTodayException] = useState(false);
   const [message, setMessage] = useState('番号 {number} のお客様、ご来店をお願いいたします。');
   const [autoCancelMinutes, setAutoCancelMinutes] = useState(10);
+
+  const [portalDisplayName, setPortalDisplayName] = useState('');
+  const [portalCategory, setPortalCategory] = useState('レストラン');
+  const [portalImageUrl, setPortalImageUrl] = useState('');
+  const [portalTagsCsv, setPortalTagsCsv] = useState('');
+  const [portalDescription, setPortalDescription] = useState('');
+  const [portalAddress, setPortalAddress] = useState('');
+  const [portalDistanceLabel, setPortalDistanceLabel] = useState('');
+  const [portalRating, setPortalRating] = useState(4.5);
+  const [portalPriceRange, setPortalPriceRange] = useState('¥1,000〜¥3,000');
+  const [portalHoursSummary, setPortalHoursSummary] = useState('');
+  const [portalMenuItems, setPortalMenuItems] = useState<MenuRow[]>([{ name: '', price: '' }]);
+  const [portalReviewsJson, setPortalReviewsJson] = useState('[]');
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -59,6 +89,25 @@ export default function SettingsPage() {
         setIsTodayException(s.isTodayException ?? false);
         setMessage(s.callMessage || '番号 {number} のお客様、ご来店をお願いいたします。');
         setAutoCancelMinutes(s.autoCancelMinutes || 10);
+        setPortalDisplayName(s.portalDisplayName ?? '');
+        setPortalCategory(s.portalCategory ?? 'レストラン');
+        setPortalImageUrl(s.portalImageUrl ?? '');
+        setPortalTagsCsv((s.portalTags ?? []).join(', '));
+        setPortalDescription(s.portalDescription ?? '');
+        setPortalAddress(s.portalAddress ?? '');
+        setPortalDistanceLabel(s.portalDistanceLabel ?? '');
+        setPortalRating(typeof s.portalRating === 'number' ? s.portalRating : 4.5);
+        setPortalPriceRange(s.portalPriceRange ?? '¥1,000〜¥3,000');
+        setPortalHoursSummary(s.portalHoursSummary ?? '');
+        const menus = s.portalMenuItems;
+        setPortalMenuItems(
+          menus && menus.length > 0
+            ? menus.map((m: MenuRow) => ({ name: m.name, price: m.price }))
+            : [{ name: '', price: '' }]
+        );
+        setPortalReviewsJson(
+          s.portalReviews && s.portalReviews.length > 0 ? JSON.stringify(s.portalReviews, null, 2) : '[]'
+        );
       })
       .catch(() => {})
       .finally(() => setIsLoading(false));
@@ -67,6 +116,29 @@ export default function SettingsPage() {
   const handleSave = async () => {
     setIsSaving(true);
     setSaveMessage('');
+    let portalReviews: { author: string; rating: number; comment: string }[] = [];
+    try {
+      const parsed = JSON.parse(portalReviewsJson || '[]');
+      if (!Array.isArray(parsed)) throw new Error('invalid');
+      portalReviews = parsed.map((r: { author?: string; rating?: number; comment?: string }) => ({
+        author: String(r.author ?? ''),
+        rating: Math.min(5, Math.max(0, Number(r.rating) || 0)),
+        comment: String(r.comment ?? ''),
+      }));
+    } catch {
+      setSaveMessage('口コミの JSON 形式が正しくありません（配列で author, rating, comment）');
+      setIsSaving(false);
+      return;
+    }
+
+    const portalTags = portalTagsCsv
+      .split(',')
+      .map((t) => t.trim())
+      .filter(Boolean);
+    const menuPayload = portalMenuItems
+      .filter((m) => m.name.trim())
+      .map((m) => ({ name: m.name.trim(), price: m.price.trim() || '—' }));
+
     try {
       const res = await fetch('/api/settings', {
         method: 'PUT',
@@ -79,6 +151,18 @@ export default function SettingsPage() {
           isTodayException,
           callMessage: message,
           autoCancelMinutes,
+          portalDisplayName,
+          portalCategory,
+          portalImageUrl,
+          portalTags,
+          portalDescription,
+          portalAddress,
+          portalDistanceLabel,
+          portalRating: Math.min(5, Math.max(0, portalRating)),
+          portalPriceRange,
+          portalHoursSummary,
+          portalMenuItems: menuPayload,
+          portalReviews,
         }),
       });
       if (!res.ok) throw new Error('保存に失敗しました');
@@ -370,6 +454,175 @@ export default function SettingsPage() {
                 <p className="font-medium mb-1">{previewMessage}</p>
                 <p className="text-xs text-white/70">スタッフまでお声がけください。</p>
               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 顧客ポータル（店舗詳細） */}
+        <div>
+          <h2 className="text-sm font-bold text-[#082752]">顧客ポータル表示</h2>
+          <p className="mt-1 text-xs text-gray-500">
+            ETABLE ユーザー向けサイト（customer-portal）の `?storeId=` 画面に反映されます。表示名が空のときはマスタ登録の店舗名を使います。
+          </p>
+          <div className="mt-4 space-y-4 rounded-[32px] border border-gray-100 bg-white p-5">
+            <div>
+              <label className="mb-1 block text-xs text-gray-500">表示名（任意）</label>
+              <input
+                type="text"
+                value={portalDisplayName}
+                onChange={(e) => setPortalDisplayName(e.target.value)}
+                placeholder="例: CIRCLEX 渋谷店（未入力でマスタの店舗名）"
+                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-[#FD780F]"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-gray-500">カテゴリ</label>
+              <input
+                type="text"
+                value={portalCategory}
+                onChange={(e) => setPortalCategory(e.target.value)}
+                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-[#FD780F]"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-gray-500">メイン画像 URL</label>
+              <input
+                type="url"
+                value={portalImageUrl}
+                onChange={(e) => setPortalImageUrl(e.target.value)}
+                placeholder="https://..."
+                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-[#FD780F]"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-gray-500">タグ（カンマ区切り）</label>
+              <input
+                type="text"
+                value={portalTagsCsv}
+                onChange={(e) => setPortalTagsCsv(e.target.value)}
+                placeholder="人気店, おすすめ, 予約推奨"
+                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-[#FD780F]"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-gray-500">説明文</label>
+              <textarea
+                value={portalDescription}
+                onChange={(e) => setPortalDescription(e.target.value)}
+                rows={3}
+                className="w-full resize-none rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-[#FD780F]"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-gray-500">住所</label>
+              <input
+                type="text"
+                value={portalAddress}
+                onChange={(e) => setPortalAddress(e.target.value)}
+                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-[#FD780F]"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-gray-500">距離表示（任意・例: 1.2km）</label>
+              <input
+                type="text"
+                value={portalDistanceLabel}
+                onChange={(e) => setPortalDistanceLabel(e.target.value)}
+                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-[#FD780F]"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-xs text-gray-500">評価（0〜5）</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  min={0}
+                  max={5}
+                  value={portalRating}
+                  onChange={(e) => setPortalRating(parseFloat(e.target.value) || 0)}
+                  className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-[#FD780F]"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-gray-500">価格帯</label>
+                <input
+                  type="text"
+                  value={portalPriceRange}
+                  onChange={(e) => setPortalPriceRange(e.target.value)}
+                  className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-[#FD780F]"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-gray-500">営業時間（ポータル表示用・任意）</label>
+              <input
+                type="text"
+                value={portalHoursSummary}
+                onChange={(e) => setPortalHoursSummary(e.target.value)}
+                placeholder="未入力のときは上記「営業情報」から自動で連結します"
+                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-[#FD780F]"
+              />
+            </div>
+            <div>
+              <div className="mb-2 flex items-center justify-between">
+                <label className="text-xs text-gray-500">メニュー</label>
+                <button
+                  type="button"
+                  onClick={() => setPortalMenuItems([...portalMenuItems, { name: '', price: '' }])}
+                  className="text-xs font-medium text-[#FD780F]"
+                >
+                  ＋ 行を追加
+                </button>
+              </div>
+              <div className="space-y-2">
+                {portalMenuItems.map((row, i) => (
+                  <div key={i} className="flex gap-2">
+                    <input
+                      type="text"
+                      value={row.name}
+                      onChange={(e) => {
+                        const next = [...portalMenuItems];
+                        next[i] = { ...next[i], name: e.target.value };
+                        setPortalMenuItems(next);
+                      }}
+                      placeholder="メニュー名"
+                      className="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-[#FD780F]"
+                    />
+                    <input
+                      type="text"
+                      value={row.price}
+                      onChange={(e) => {
+                        const next = [...portalMenuItems];
+                        next[i] = { ...next[i], price: e.target.value };
+                        setPortalMenuItems(next);
+                      }}
+                      placeholder="価格"
+                      className="w-24 rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-[#FD780F]"
+                    />
+                    {portalMenuItems.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => setPortalMenuItems(portalMenuItems.filter((_, j) => j !== i))}
+                        className="px-2 text-gray-400"
+                        aria-label="削除"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-gray-500">口コミ（JSON 配列）</label>
+              <textarea
+                value={portalReviewsJson}
+                onChange={(e) => setPortalReviewsJson(e.target.value)}
+                rows={6}
+                className="w-full resize-none rounded-xl border border-gray-200 px-4 py-3 font-mono text-xs outline-none focus:border-[#FD780F]"
+                placeholder='[{"author":"名前","rating":5,"comment":"本文"}]'
+              />
             </div>
           </div>
         </div>

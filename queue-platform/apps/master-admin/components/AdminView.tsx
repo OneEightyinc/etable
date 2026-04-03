@@ -9,12 +9,17 @@ import {
   deleteAccountApi,
   type AccountData,
 } from '@queue-platform/api';
+import { useAppBaseUrls } from '../hooks/useAppBaseUrls';
+import { appendStoreQuery, isLocalHostname } from '../lib/publicAppUrls';
 
 interface AdminViewProps {
   onLogout: () => void;
 }
 
 const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
+  const appUrls = useAppBaseUrls();
+  const [mounted, setMounted] = useState(false);
+
   const [accounts, setAccounts] = useState<AccountData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -51,19 +56,33 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
     fetchAccounts();
   }, [fetchAccounts]);
 
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const showAppUrlConfigWarning =
+    mounted &&
+    typeof window !== 'undefined' &&
+    !isLocalHostname(window.location.hostname) &&
+    (!appUrls.storeAdmin || !appUrls.kiosk || !appUrls.customer);
+
   const handleDelete = (account: AccountData) => {
     setDeleteTarget(account);
   };
 
   const confirmDelete = async () => {
     if (!deleteTarget) return;
+    const ok = window.confirm(
+      `「${deleteTarget.storeName}」（ID: ${deleteTarget.id}）をデータベースから完全に削除します。\nこの操作は取り消せません。続行しますか？`
+    );
+    if (!ok) return;
     try {
       await deleteAccountApi(deleteTarget.id);
       setAccounts((prev) => prev.filter((a) => a.id !== deleteTarget.id));
+      setDeleteTarget(null);
     } catch (err: any) {
       setError(err.message);
     }
-    setDeleteTarget(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -206,6 +225,16 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
         </header>
 
         <div className="flex-1 overflow-y-auto p-4 lg:p-12 pb-[100px]">
+          {showAppUrlConfigWarning && (
+            <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-3 text-sm font-bold text-amber-900">
+              店舗管理・キオスク・顧客ポータルの URL が未設定です。Vercel の master-admin プロジェクトに{' '}
+              <code className="rounded bg-amber-100 px-1 text-xs">NEXT_PUBLIC_STORE_ADMIN_URL</code> /{' '}
+              <code className="rounded bg-amber-100 px-1 text-xs">NEXT_PUBLIC_KIOSK_URL</code> /{' '}
+              <code className="rounded bg-amber-100 px-1 text-xs">NEXT_PUBLIC_CUSTOMER_PORTAL_URL</code>{' '}
+              を設定し、再デプロイしてください。
+            </div>
+          )}
+
           {error && (
             <div className="mb-6 bg-red-50 text-red-600 text-sm font-bold px-5 py-3 rounded-2xl border border-red-100">
               {error}
@@ -250,7 +279,9 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
                             disabled={!!editingAccount}
                             className="flex-1 min-w-0 px-4 lg:px-6 py-3 lg:py-4 rounded-l-xl lg:rounded-l-2xl border-2 border-r-0 border-gray-50 bg-gray-50/50 focus:bg-white focus:border-[#fd780f] outline-none transition-all text-sm lg:text-base text-gray-900 font-inter disabled:opacity-50"
                           />
-                          <div className="px-3 lg:px-6 py-3 lg:py-4 bg-gray-100 border-2 border-l-0 border-gray-50 rounded-r-xl lg:rounded-r-2xl text-[10px] lg:text-sm text-gray-400 font-inter font-bold">.wait-system.com</div>
+                          <div className="px-3 lg:px-6 py-3 lg:py-4 bg-gray-100 border-2 border-l-0 border-gray-50 rounded-r-xl lg:rounded-r-2xl text-[10px] lg:text-sm text-gray-400 font-inter font-bold max-w-[140px] leading-tight">
+                            {process.env.NEXT_PUBLIC_ACCOUNT_ID_SUFFIX || '店舗URL→一覧'}
+                          </div>
                         </div>
                       </div>
                       <div className="space-y-2">
@@ -337,13 +368,22 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
           ) : (
             <div className="animate-in fade-in duration-500">
               <div className="hidden md:block bg-white rounded-[1.5rem] lg:rounded-[2.5rem] shadow-xl border border-gray-100 overflow-hidden">
-                <table className="w-full border-collapse">
+                <div className="overflow-x-auto">
+                <table className="w-full min-w-[960px] border-collapse table-fixed">
+                  <colgroup>
+                    <col className="w-[17%]" />
+                    <col className="w-[20%]" />
+                    <col className="min-w-[7.5rem] w-[14%]" />
+                    <col className="w-[27%]" />
+                    <col className="w-[12%]" />
+                    <col className="w-[10%]" />
+                  </colgroup>
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-100">
                       <th className="px-6 lg:px-10 py-6 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">店舗ID / 会社・店舗名</th>
-                      <th className="px-6 lg:px-10 py-6 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">メールアドレス</th>
-                      <th className="px-6 lg:px-10 py-6 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">ステータス</th>
-                      <th className="px-6 lg:px-10 py-6 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">店舗URL</th>
+                      <th className="pl-6 lg:pl-10 pr-3 lg:pr-4 py-6 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">メールアドレス</th>
+                      <th className="px-4 lg:px-5 py-6 text-center text-[10px] font-black text-gray-400 tracking-wide whitespace-nowrap">ステータス</th>
+                      <th className="pl-5 lg:pl-6 pr-6 lg:pr-10 py-6 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">店舗URL</th>
                       <th className="px-6 lg:px-10 py-6 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">発行日</th>
                       <th className="px-6 lg:px-10 py-6 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">操作</th>
                     </tr>
@@ -357,40 +397,40 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
                             <p className="text-xs lg:text-sm text-gray-400 font-bold">{acc.storeName}</p>
                           </div>
                         </td>
-                        <td className="px-6 lg:px-10 py-6 text-xs lg:text-sm font-inter font-medium text-gray-600">{acc.email}</td>
-                        <td className="px-6 lg:px-10 py-6 text-center">
-                          <span className={`inline-block px-3 lg:px-4 py-1 rounded-full text-[9px] lg:text-[10px] font-inter font-black uppercase tracking-wider ${acc.status === 'ACTIVE' ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
+                        <td className="pl-6 lg:pl-10 pr-3 lg:pr-4 py-6 text-xs lg:text-sm font-inter font-medium text-gray-600 break-words">{acc.email}</td>
+                        <td className="px-4 lg:px-5 py-6 text-center align-middle">
+                          <span className={`inline-block whitespace-nowrap px-3.5 lg:px-4 py-1.5 rounded-full text-[10px] lg:text-[11px] font-inter font-black uppercase tracking-wide ${acc.status === 'ACTIVE' ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
                             {acc.status}
                           </span>
                         </td>
-                        <td className="px-6 lg:px-10 py-6">
-                          <div className="space-y-1">
+                        <td className="pl-5 lg:pl-6 pr-4 lg:pr-6 py-6 align-top">
+                          <div className="flex flex-wrap gap-x-3 gap-y-2">
                             <a
-                              href={`${window.location.protocol}//${window.location.hostname}:3005/?storeId=${acc.id}`}
+                              href={appendStoreQuery(appUrls.storeAdmin, acc.id)}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center space-x-1.5 text-xs lg:text-sm font-inter font-medium text-[#fd780f] hover:text-[#e46a0a] hover:underline transition-colors"
+                              className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg bg-[#fd780f]/10 px-2.5 py-1.5 text-xs font-inter font-bold text-[#fd780f] transition-colors hover:bg-[#fd780f]/15 hover:underline"
                             >
-                              <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-                              <span>店舗管理</span>
+                              <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                              店舗管理
                             </a>
                             <a
-                              href={`${window.location.protocol}//${window.location.hostname}:3007/?storeId=${acc.id}`}
+                              href={appendStoreQuery(appUrls.kiosk, acc.id)}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center space-x-1.5 text-xs lg:text-sm font-inter font-medium text-[#082752] hover:text-[#0a3366] hover:underline transition-colors"
+                              className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg bg-[#082752]/10 px-2.5 py-1.5 text-xs font-inter font-bold text-[#082752] transition-colors hover:bg-[#082752]/15 hover:underline"
                             >
-                              <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-                              <span>キオスク</span>
+                              <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                              キオスク
                             </a>
                             <a
-                              href={`${window.location.protocol}//${window.location.hostname}:3006/?storeId=${acc.id}`}
+                              href={appendStoreQuery(appUrls.customer, acc.id)}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center space-x-1.5 text-xs lg:text-sm font-inter font-medium text-gray-500 hover:text-gray-700 hover:underline transition-colors"
+                              className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg bg-gray-100 px-2.5 py-1.5 text-xs font-inter font-bold text-gray-600 transition-colors hover:bg-gray-200 hover:underline"
                             >
-                              <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
-                              <span>顧客ポータル</span>
+                              <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                              顧客ポータル
                             </a>
                           </div>
                         </td>
@@ -409,6 +449,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
                     ))}
                   </tbody>
                 </table>
+                </div>
               </div>
 
               <div className="md:hidden space-y-4">
@@ -429,31 +470,31 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
                     </div>
                     <div className="flex flex-wrap gap-2 pt-3 border-t border-gray-50">
                       <a
-                        href={`${window.location.protocol}//${window.location.hostname}:3005/?storeId=${acc.id}`}
+                        href={appendStoreQuery(appUrls.storeAdmin, acc.id)}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-[#fd780f]/10 text-[#fd780f] text-xs font-bold"
+                        className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg bg-[#fd780f]/10 px-3 py-1.5 text-xs font-bold text-[#fd780f]"
                       >
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-                        <span>店舗管理</span>
+                        <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                        店舗管理
                       </a>
                       <a
-                        href={`${window.location.protocol}//${window.location.hostname}:3007/?storeId=${acc.id}`}
+                        href={appendStoreQuery(appUrls.kiosk, acc.id)}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-[#082752]/10 text-[#082752] text-xs font-bold"
+                        className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg bg-[#082752]/10 px-3 py-1.5 text-xs font-bold text-[#082752]"
                       >
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-                        <span>キオスク</span>
+                        <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                        キオスク
                       </a>
                       <a
-                        href={`${window.location.protocol}//${window.location.hostname}:3006/?storeId=${acc.id}`}
+                        href={appendStoreQuery(appUrls.customer, acc.id)}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-gray-100 text-gray-500 text-xs font-bold"
+                        className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-bold text-gray-600"
                       >
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
-                        <span>顧客</span>
+                        <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                        顧客ポータル
                       </a>
                     </div>
                     <div className="flex items-center justify-between pt-3 border-t border-gray-50">
@@ -484,8 +525,8 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
           onClose={() => setDeleteTarget(null)}
           onConfirm={confirmDelete}
           title="アカウントを削除しますか？"
-          message={`「${deleteTarget.storeName}」（${deleteTarget.id}）を完全に削除します。この操作は取り消せません。`}
-          confirmText="削除を確定"
+          message={`「${deleteTarget.storeName}」（${deleteTarget.id}）をデータベースから物理削除します。次の画面でブラウザの確認ダイアログが表示されます。`}
+          confirmText="削除へ進む"
           isDangerous
         />
       )}

@@ -27,10 +27,13 @@ export {
   getStoreSettings,
   updateStoreSettings,
   getStorePortalProfile,
+  listActiveStoreProfiles,
   getCustomerProfileById,
   createCustomerProfile,
   updateCustomerProfile,
   deleteCustomerProfile,
+  addSurveyResponse,
+  getSurveyResponses,
 } from './db';
 
 export type {
@@ -40,6 +43,7 @@ export type {
   StoreSettings,
   StorePortalProfile,
   CustomerProfileRecord,
+  SurveyResponse,
 } from './db';
 
 // Auth middleware

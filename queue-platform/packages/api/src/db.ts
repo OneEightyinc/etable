@@ -86,6 +86,28 @@ export interface CustomerProfileRecord {
   updatedAt: string;
 }
 
+export interface SurveyResponse {
+  id: string;
+  storeId: string;
+  visitedAt: string;
+  gender: "male" | "female" | "other" | "no_answer";
+  ageGroup: "teens" | "20s_early" | "20s_late" | "30s_early" | "30s_late" | "40s" | "50s_plus";
+  groupType: "solo" | "friends" | "couple" | "family" | "business";
+  visitPurpose: "lunch" | "dinner" | "drinking" | "date" | "work_cafe" | "other";
+  stayDuration: "under_30min" | "30to60min" | "1to2hours" | "over_2hours";
+  visitCount: "first" | "second_third" | "regular";
+  budgetPerPerson: number;
+  acquisitionChannels: string[];
+  favoriteMenu: string | null;
+  etableReview: string | null;
+  satisfactionScore: number;
+  waitTimeTolerance: boolean;
+  revisitIntention: "yes" | "no" | "maybe";
+  residenceArea: string | null;
+  workArea: string | null;
+  occupation: "employee" | "student" | "freelance" | "self_employed" | "homemaker" | "retired" | "other" | null;
+}
+
 /** 顧客ポータル用の公開ペイロード（認証不要 API 向け） */
 export type StorePortalProfile = {
   storeId: string;
@@ -115,6 +137,7 @@ interface Database {
   counters: Record<string, number>;
   storeSettings: StoreSettings[];
   customerProfiles: CustomerProfileRecord[];
+  surveyResponses: SurveyResponse[];
 }
 
 const REMOTE_DB_KEY = "queue-platform:database:v1";
@@ -208,6 +231,7 @@ function getDefaultDb(): Database {
     counters: {},
     storeSettings: [],
     customerProfiles: [],
+    surveyResponses: [],
   };
 }
 
@@ -230,6 +254,7 @@ function normalizeDatabase(raw: unknown): Database {
     customerProfiles: Array.isArray(d.customerProfiles)
       ? (d.customerProfiles as CustomerProfileRecord[])
       : [],
+    surveyResponses: Array.isArray(d.surveyResponses) ? (d.surveyResponses as SurveyResponse[]) : [],
   };
 }
 
@@ -260,9 +285,10 @@ function loadDbFromFile(): Database {
 export async function readDatabase(): Promise<Database> {
   const r = getRedis();
   if (r) {
-    const raw = await r.get<string>(REMOTE_DB_KEY);
+    const raw = await r.get(REMOTE_DB_KEY);
     if (raw) {
-      globalForDb._queueDb = normalizeDatabase(JSON.parse(raw));
+      const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+      globalForDb._queueDb = normalizeDatabase(parsed);
       return globalForDb._queueDb!;
     }
     globalForDb._queueDb = getDefaultDb();
@@ -365,10 +391,10 @@ export async function createAccount(data: {
 }): Promise<Account> {
   const db = await readDatabase();
   if (db.accounts.some((a) => a.id === data.id)) {
-    throw new Error("Account ID already exists");
+    throw new Error("このアカウントIDは既に使用されています");
   }
   if (db.accounts.some((a) => a.email === data.email)) {
-    throw new Error("Email already exists");
+    throw new Error("このメールアドレスは既に登録されています");
   }
   const now = new Date().toISOString();
   const account: Account = {
@@ -392,7 +418,7 @@ export async function updateAccount(
 ): Promise<Account> {
   const db = await readDatabase();
   const idx = db.accounts.findIndex((a) => a.id === id);
-  if (idx === -1) throw new Error("Account not found");
+  if (idx === -1) throw new Error("アカウントが見つかりません");
   const account = db.accounts[idx];
   if (data.name !== undefined) account.name = data.name;
   if (data.email !== undefined) account.email = data.email;
@@ -472,7 +498,7 @@ export async function updateQueueStatus(
 ): Promise<QueueEntry> {
   const db = await readDatabase();
   const entry = db.queue.find((q) => q.id === id);
-  if (!entry) throw new Error("Queue entry not found");
+  if (!entry) throw new Error("順番待ちデータが見つかりません");
   entry.status = status;
   entry.updatedAt = new Date().toISOString();
   if (status === "CALLED") {
@@ -535,7 +561,7 @@ export async function getQueueHistory(storeId: string): Promise<QueueEntry[]> {
 export async function restoreQueueEntry(id: string): Promise<QueueEntry> {
   const db = await readDatabase();
   const entry = db.queue.find((q) => q.id === id);
-  if (!entry) throw new Error("Queue entry not found");
+  if (!entry) throw new Error("順番待ちデータが見つかりません");
   entry.status = "WAITING";
   entry.updatedAt = new Date().toISOString();
   await persistDatabase();
@@ -630,6 +656,13 @@ export async function getStorePortalProfile(storeId: string): Promise<StorePorta
   };
 }
 
+export async function listActiveStoreProfiles(): Promise<StorePortalProfile[]> {
+  const accounts = await getAllAccounts();
+  const active = accounts.filter((a) => a.status === "ACTIVE");
+  const profiles = await Promise.all(active.map((a) => getStorePortalProfile(a.id)));
+  return profiles.filter((p): p is StorePortalProfile => p !== null);
+}
+
 export async function getStoreSettings(storeId: string): Promise<StoreSettings> {
   const db = await readDatabase();
   if (!db.storeSettings) db.storeSettings = [];
@@ -713,7 +746,7 @@ export async function updateCustomerProfile(
   const db = await readDatabase();
   if (!db.customerProfiles) db.customerProfiles = [];
   const idx = db.customerProfiles.findIndex((c) => c.id === id);
-  if (idx === -1) throw new Error("Customer not found");
+  if (idx === -1) throw new Error("顧客が見つかりません");
   const row = db.customerProfiles[idx];
   if (data.displayName !== undefined) row.displayName = data.displayName.trim();
   if (data.email !== undefined) row.email = data.email.trim();
@@ -733,4 +766,33 @@ export async function deleteCustomerProfile(id: string): Promise<boolean> {
     return true;
   }
   return false;
+}
+
+// ─── Survey Responses ───────────────────────────────────
+export async function addSurveyResponse(data: Omit<SurveyResponse, "id" | "visitedAt">): Promise<SurveyResponse> {
+  const db = await readDatabase();
+  if (!db.surveyResponses) db.surveyResponses = [];
+  const row: SurveyResponse = {
+    id: crypto.randomUUID(),
+    visitedAt: new Date().toISOString(),
+    ...data,
+  };
+  db.surveyResponses.push(row);
+  await persistDatabase();
+  return row;
+}
+
+export async function getSurveyResponses(
+  storeId: string,
+  from?: string,
+  to?: string
+): Promise<SurveyResponse[]> {
+  const db = await readDatabase();
+  if (!db.surveyResponses) return [];
+  return db.surveyResponses.filter((r) => {
+    if (r.storeId !== storeId) return false;
+    if (from && r.visitedAt < from) return false;
+    if (to && r.visitedAt > to) return false;
+    return true;
+  });
 }

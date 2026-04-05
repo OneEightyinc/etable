@@ -6,14 +6,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
   const session = getSessionFromRequest(req);
-  if (!session) return res.status(401).json({ error: 'Unauthorized' });
+  if (!session) return res.status(401).json({ error: '認証が必要です' });
 
   if (session.role === 'SUPER_ADMIN') {
     return res.status(200).json({ user: { id: session.userId, role: 'SUPER_ADMIN', email: 'admin@circlex.jp' } });
   }
 
   const account = await getAccountById(session.userId);
-  if (!account) return res.status(401).json({ error: 'Account not found' });
+  if (!account) return res.status(401).json({ error: 'アカウントが見つかりません' });
 
   return res.status(200).json({
     user: { id: account.id, email: account.email, role: 'STORE_ADMIN', storeName: account.storeName, storeId: account.id },

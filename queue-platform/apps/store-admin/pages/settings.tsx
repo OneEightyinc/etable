@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
+import { compressImageForPortal } from '../lib/compressImageForPortal';
 
 interface BusinessHour {
   id: string;
@@ -67,6 +68,8 @@ export default function SettingsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
+  const [portalImageBusy, setPortalImageBusy] = useState(false);
+  const portalImageInputRef = useRef<HTMLInputElement>(null);
 
   // Add business hour modal
   const [showAddHour, setShowAddHour] = useState(false);
@@ -165,7 +168,10 @@ export default function SettingsPage() {
           portalReviews,
         }),
       });
-      if (!res.ok) throw new Error('保存に失敗しました');
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        throw new Error(typeof errBody.error === 'string' ? errBody.error : '保存に失敗しました');
+      }
       setSaveMessage('保存しました');
       setTimeout(() => setSaveMessage(''), 2000);
     } catch (err: any) {
@@ -485,14 +491,77 @@ export default function SettingsPage() {
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs text-gray-500">メイン画像 URL</label>
-              <input
-                type="url"
-                value={portalImageUrl}
-                onChange={(e) => setPortalImageUrl(e.target.value)}
-                placeholder="https://..."
-                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-[#FD780F]"
-              />
+              <label className="mb-1 block text-xs font-medium text-gray-600">メイン画像</label>
+              <p className="mb-3 text-xs text-gray-500">
+                店内の写真をアップロードすると、顧客ポータルの店舗ページに表示されます（端末上で自動的に縮小・圧縮して保存します）。
+              </p>
+              <div className="relative mb-3 aspect-[16/10] w-full max-w-md overflow-hidden rounded-2xl border border-gray-200 bg-gray-50">
+                {portalImageUrl ? (
+                  <img src={portalImageUrl} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <div className="flex h-full min-h-[140px] items-center justify-center px-4 text-center text-xs text-gray-400">
+                    画像が未設定です
+                  </div>
+                )}
+              </div>
+              <div className="mb-3 flex flex-wrap gap-2">
+                <input
+                  ref={portalImageInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = '';
+                    if (!file) return;
+                    setPortalImageBusy(true);
+                    setSaveMessage('');
+                    try {
+                      const dataUrl = await compressImageForPortal(file);
+                      setPortalImageUrl(dataUrl);
+                    } catch (err) {
+                      setSaveMessage(err instanceof Error ? err.message : '画像の読み込みに失敗しました');
+                    } finally {
+                      setPortalImageBusy(false);
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  disabled={portalImageBusy}
+                  onClick={() => portalImageInputRef.current?.click()}
+                  className="rounded-xl bg-[#082752] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#0a3266] disabled:opacity-50"
+                >
+                  {portalImageBusy ? '処理中…' : '画像を選択'}
+                </button>
+                {portalImageUrl ? (
+                  <button
+                    type="button"
+                    disabled={portalImageBusy}
+                    onClick={() => {
+                      setPortalImageUrl('');
+                      setSaveMessage('');
+                    }}
+                    className="rounded-xl border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    画像を削除
+                  </button>
+                ) : null}
+              </div>
+              <details className="rounded-xl border border-gray-100 bg-gray-50/80 px-3 py-2 text-xs">
+                <summary className="cursor-pointer font-medium text-gray-600">URL で指定する</summary>
+                <p className="mt-2 text-gray-500">
+                  自社 CDN など HTTPS の画像 URL をそのまま使う場合はこちら。アップロード画像があるときは一度「画像を削除」してから入力してください。
+                </p>
+                <input
+                  type="url"
+                  value={portalImageUrl.startsWith('data:') ? '' : portalImageUrl}
+                  disabled={portalImageUrl.startsWith('data:')}
+                  onChange={(ev) => setPortalImageUrl(ev.target.value)}
+                  placeholder="https://..."
+                  className="mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-[#FD780F] disabled:bg-gray-100 disabled:text-gray-400"
+                />
+              </details>
             </div>
             <div>
               <label className="mb-1 block text-xs text-gray-500">タグ（カンマ区切り）</label>

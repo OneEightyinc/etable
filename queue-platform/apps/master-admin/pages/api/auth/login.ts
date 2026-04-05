@@ -29,7 +29,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const password = typeof rawPassword === "string" ? rawPassword : "";
 
     if (!email || !password) {
-      return res.status(400).json({ error: "Email and password are required" });
+      return res.status(400).json({ error: "メールアドレスとパスワードを入力してください" });
     }
 
     const pwHash = hashPassword(password);
@@ -60,9 +60,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    return res.status(401).json({ error: "Invalid email or password" });
-  } catch (err) {
+    return res.status(401).json({ error: "メールアドレスまたはパスワードが正しくありません" });
+  } catch (err: any) {
     console.error("[api/auth/login]", err);
-    return res.status(500).json({ error: "Internal server error" });
+    return res.status(500).json({ error: "サーバーエラーが発生しました" });
   }
 }

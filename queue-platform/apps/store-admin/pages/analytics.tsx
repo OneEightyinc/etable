@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import Link from 'next/link';
+import SurveyDashboard from '../components/analytics/SurveyDashboard';
 
 type Period = 'today' | 'week' | 'month';
 
@@ -217,6 +218,14 @@ export default function AnalyticsPage() {
               </div>
             ))}
           </div>
+        </div>
+
+        {/* 来店者アンケート Section */}
+        <div className="mt-8 border-t border-gray-200 pt-8">
+          <div className="flex items-center gap-2 mb-6">
+            <span className="text-lg font-bold text-[#082752]">📋 来店者アンケート</span>
+          </div>
+          <SurveyDashboard storeId="shibuya-001" />
         </div>
       </div>
     </div>

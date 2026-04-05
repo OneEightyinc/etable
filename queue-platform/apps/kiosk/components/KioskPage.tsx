@@ -77,9 +77,11 @@ export default function KioskPage() {
   const text = translations[lang];
   const canSubmitPhone = phone.length === MAX_PHONE;
 
-  // Fetch initial queue stats
+  // 待ち組数の取得（完了画面では走らせない。POST 直後に別リクエストが古い stats で上書きするのを防ぐ）
   useEffect(() => {
-    fetch(`/api/queue?storeId=${STORE_ID}`)
+    if (step === "complete") return;
+    const ac = new AbortController();
+    fetch(`/api/queue?storeId=${STORE_ID}`, { signal: ac.signal })
       .then((r) => r.json())
       .then((data) => {
         if (data.stats) {
@@ -89,6 +91,7 @@ export default function KioskPage() {
         }
       })
       .catch(() => {});
+    return () => ac.abort();
   }, [step]);
 
   useEffect(() => {
@@ -382,17 +385,26 @@ export default function KioskPage() {
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({ storeId: STORE_ID, adults: people, children: 0, seatType: seat, phone }),
                     });
-                    const data = await res.json();
-                    if (data.entry) {
-                      setTicketNumber(data.entry.ticketNumber);
+                    let data: { entry?: { ticketNumber: number }; stats?: { waitingCount: number; estimatedWait: number; currentTicket: number | null }; error?: string } = {};
+                    try {
+                      data = (await res.json()) as typeof data;
+                    } catch {
+                      data = {};
                     }
-                    if (data.stats) {
-                      setWaitingCount(data.stats.waitingCount);
-                      setEstimatedWait(data.stats.estimatedWait);
-                      setCurrentTicket(data.stats.currentTicket);
+                    if (!res.ok) {
+                      console.error("[kiosk] queue POST failed", res.status, data.error);
+                    } else {
+                      if (data.entry && typeof data.entry.ticketNumber === "number") {
+                        setTicketNumber(data.entry.ticketNumber);
+                      }
+                      if (data.stats) {
+                        setWaitingCount(data.stats.waitingCount);
+                        setEstimatedWait(data.stats.estimatedWait);
+                        setCurrentTicket(data.stats.currentTicket);
+                      }
                     }
-                  } catch {
-                    // continue even if API fails
+                  } catch (e) {
+                    console.error("[kiosk] queue POST", e);
                   } finally {
                     setIsSubmitting(false);
                     setStep("complete");

@@ -130,11 +130,11 @@ export function requireAuth(
 ): Session | null {
   const session = getSessionFromRequest(req);
   if (!session) {
-    res.status(401).json({ error: 'Unauthorized' });
+    res.status(401).json({ error: '認証が必要です' });
     return null;
   }
   if (allowedRoles && !allowedRoles.includes(session.role)) {
-    res.status(403).json({ error: 'Forbidden' });
+    res.status(403).json({ error: '権限がありません' });
     return null;
   }
   return session;

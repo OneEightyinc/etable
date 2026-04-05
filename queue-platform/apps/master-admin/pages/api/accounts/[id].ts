@@ -6,11 +6,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!session) return;
 
   const { id } = req.query;
-  if (typeof id !== 'string') return res.status(400).json({ error: 'Invalid ID' });
+  if (typeof id !== 'string') return res.status(400).json({ error: '無効なIDです' });
 
   if (req.method === 'GET') {
     const account = await getAccountById(id);
-    if (!account) return res.status(404).json({ error: 'Account not found' });
+    if (!account) return res.status(404).json({ error: 'アカウントが見つかりません' });
     return res.status(200).json({
       account: {
         id: account.id,
@@ -43,7 +43,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (req.method === 'DELETE') {
     const deleted = await deleteAccount(id);
-    if (!deleted) return res.status(404).json({ error: 'Account not found' });
+    if (!deleted) return res.status(404).json({ error: 'アカウントが見つかりません' });
     return res.status(200).json({ ok: true });
   }
 

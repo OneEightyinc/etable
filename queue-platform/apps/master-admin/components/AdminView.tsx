@@ -1,6 +1,5 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import Image from 'next/image';
 import GlassModal from './GlassModal';
 import {
   getAccounts,
@@ -154,7 +153,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
     <>
       <div className="flex flex-col mb-8">
         <div className="select-none">
-          <Image src="/circlx_white.svg" alt="CIRCLX" width={150} height={50} />
+          <img src={`${process.env.NEXT_PUBLIC_API_PREFIX || ''}/circlx_white.svg`} alt="CIRCLX" width={150} height={50} />
         </div>
       </div>
 

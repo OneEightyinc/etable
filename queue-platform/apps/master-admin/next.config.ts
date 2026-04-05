@@ -4,6 +4,13 @@ import type { NextConfig } from "next";
 const monorepoRoot = path.join(__dirname, "..", "..");
 
 const nextConfig: NextConfig = {
+  assetPrefix: "https://master-admin-xi.vercel.app",
+  env: {
+    NEXT_PUBLIC_API_PREFIX: "/admin",
+    NEXT_PUBLIC_STORE_ADMIN_URL: "https://etable.net/store",
+    NEXT_PUBLIC_KIOSK_URL: "https://etable.net/kiosk",
+    NEXT_PUBLIC_CUSTOMER_PORTAL_URL: "https://etable.net",
+  },
   transpilePackages: ["@queue-platform/api"],
   // Vercel / monorepo: trace shared package from queue-platform root
   outputFileTracingRoot: monorepoRoot,
@@ -15,6 +22,7 @@ const nextConfig: NextConfig = {
     root: monorepoRoot
   },
   images: {
+    unoptimized: true,
     dangerouslyAllowSVG: true,
     contentDispositionType: "attachment",
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;"

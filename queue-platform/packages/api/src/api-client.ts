@@ -3,18 +3,21 @@
  * Shared across all frontend apps.
  */
 
-const BASE = '/api';
+function getBase(): string {
+  const prefix = typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_API_PREFIX || '' : '';
+  return `${prefix}/api`;
+}
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${url}`, {
+  const res = await fetch(`${getBase()}${url}`, {
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     ...options,
   });
 
   if (!res.ok) {
-    const body = await res.json().catch(() => ({ error: 'Unknown error' }));
-    throw new Error(body.error || `HTTP ${res.status}`);
+    const body = await res.json().catch(() => ({ error: '不明なエラーが発生しました' }));
+    throw new Error(body.error || `通信エラー (HTTP ${res.status})`);
   }
 
   return res.json();
@@ -44,14 +47,14 @@ export async function logout(): Promise<void> {
 }
 
 export async function getMe(): Promise<LoginResponse['user'] | null> {
-  const res = await fetch(`${BASE}/auth/me`, {
+  const res = await fetch(`${getBase()}/auth/me`, {
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
   });
   if (res.status === 401) return null;
   if (!res.ok) {
-    const body = await res.json().catch(() => ({ error: 'Unknown error' }));
-    throw new Error(body.error || `HTTP ${res.status}`);
+    const body = await res.json().catch(() => ({ error: '不明なエラーが発生しました' }));
+    throw new Error(body.error || `通信エラー (HTTP ${res.status})`);
   }
   const data = (await res.json()) as { user: LoginResponse['user'] };
   return data.user;
@@ -217,7 +220,7 @@ export function subscribeToQueue(
   onUpdate: (data: { type: string; queue: QueueEntryData[]; entry?: QueueEntryData }) => void,
   onInit?: (data: { queue: QueueEntryData[] }) => void
 ): () => void {
-  const es = new EventSource(`/api/sse/queue?storeId=${storeId}`);
+  const es = new EventSource(`${getBase()}/sse/queue?storeId=${storeId}`);
 
   es.addEventListener('init', (e) => {
     const data = JSON.parse(e.data);

@@ -696,7 +696,13 @@ export async function updateStoreSettings(
   if (data.autoCancelMinutes !== undefined) settings.autoCancelMinutes = data.autoCancelMinutes;
   if (data.portalDisplayName !== undefined) settings.portalDisplayName = data.portalDisplayName;
   if (data.portalCategory !== undefined) settings.portalCategory = data.portalCategory;
-  if (data.portalImageUrl !== undefined) settings.portalImageUrl = data.portalImageUrl;
+  if (data.portalImageUrl !== undefined) {
+    const v = data.portalImageUrl.trim();
+    if (v.length > 2_000_000) {
+      throw new Error("メイン画像のデータが大きすぎます。画像を小さくしてから再度お試しください。");
+    }
+    settings.portalImageUrl = v;
+  }
   if (data.portalTags !== undefined) settings.portalTags = data.portalTags;
   if (data.portalDescription !== undefined) settings.portalDescription = data.portalDescription;
   if (data.portalAddress !== undefined) settings.portalAddress = data.portalAddress;

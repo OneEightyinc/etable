@@ -20,7 +20,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method === 'POST') {
     const { id, name, email, password, storeName, status } = req.body;
     if (!id || !email || !password || !storeName) {
-      return res.status(400).json({ error: 'Missing required fields' });
+      return res.status(400).json({ error: '必須項目が入力されていません' });
     }
     try {
       const account = await createAccount({

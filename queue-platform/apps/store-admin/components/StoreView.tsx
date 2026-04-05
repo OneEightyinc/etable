@@ -224,7 +224,7 @@ const StoreView: React.FC<{ storeId?: string }> = ({ storeId: storeIdProp }) => 
               <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
             </svg>
           </button>
-          <img src="/etable-logo-white.svg" alt="ETABLE" className="h-6 w-auto" />
+          <img src={`${process.env.NEXT_PUBLIC_API_PREFIX || ''}/etable-logo-white.svg`} alt="ETABLE" width={120} height={24} className="h-6 w-auto" />
           <button className="h-10 w-[88px] bg-white rounded-full text-[12px] font-semibold text-[#FD780F] inline-flex items-center justify-center">履歴</button>
         </div>
         <div className="flex items-end justify-between">

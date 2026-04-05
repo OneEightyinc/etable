@@ -4,6 +4,10 @@ import type { NextConfig } from "next";
 const monorepoRoot = path.join(__dirname, "..", "..");
 
 const nextConfig: NextConfig = {
+  assetPrefix: "https://store-admin-v2-rosy.vercel.app",
+  env: {
+    NEXT_PUBLIC_API_PREFIX: "/store",
+  },
   transpilePackages: ["@queue-platform/api"],
   outputFileTracingRoot: monorepoRoot,
   outputFileTracingIncludes: {
@@ -11,6 +15,9 @@ const nextConfig: NextConfig = {
   },
   turbopack: {
     root: monorepoRoot,
+  },
+  images: {
+    unoptimized: true,
   },
 };
 

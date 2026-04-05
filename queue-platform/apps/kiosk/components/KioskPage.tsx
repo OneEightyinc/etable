@@ -99,7 +99,7 @@ export default function KioskPage() {
       setPeople(1);
       setSeat("EITHER");
       setShowNotice(false);
-    }, 3000);
+    }, 30000);
     return () => clearTimeout(timer);
   }, [step]);
 
@@ -452,6 +452,9 @@ export default function KioskPage() {
                   <span className="text-[#FF8100]">{currentTicket ?? "-"}</span>
                   番
                 </p>
+                <div className="wait-pill-text mt-2 inline-flex items-center justify-center rounded-full bg-[#F5F8FF] px-8 py-3 font-semibold text-[#001133]">
+                  現在の順番待ち：<span className="ml-1 text-[#FF8100]">{waitingCount}組</span>
+                </div>
                 <div className="wait-pill-text mt-2 inline-flex items-center justify-center rounded-full bg-[#F5F8FF] px-8 py-3 font-semibold text-[#001133]">
                   目安待ち時間：約<span className="ml-1">{estimatedWait}分</span>
                 </div>

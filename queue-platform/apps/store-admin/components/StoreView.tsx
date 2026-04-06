@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect } from "react";
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import GlassModal from './GlassModal';
@@ -33,13 +33,26 @@ function fmtTimer(min: number) {
   return `${m}:00`;
 }
 
+function formatElapsedSince(iso: string | undefined, t: Date) {
+  if (!iso) return "0:00";
+  const sec = Math.max(0, Math.floor((t.getTime() - new Date(iso).getTime()) / 1000));
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
 /* ─── component ─── */
-const StoreView: React.FC<{ storeId?: string }> = ({ storeId: storeIdProp }) => {
+const StoreView: React.FC<{ storeId?: string; onLogout?: () => void }> = ({
+  storeId: storeIdProp,
+  onLogout,
+}) => {
   const router = useRouter();
-  const storeId =
-    (router.isReady && typeof router.query.storeId === 'string' && router.query.storeId) ||
-    storeIdProp ||
-    'shibuya-001';
+  const rawStoreId = router.query.storeId;
+  const storeIdFromQuery =
+    router.isReady && rawStoreId
+      ? (Array.isArray(rawStoreId) ? rawStoreId[0] : rawStoreId)
+      : undefined;
+  const storeId = (storeIdFromQuery && storeIdFromQuery.trim()) || storeIdProp || "shibuya-001";
   const [customers, setCustomers] = useState<QueueEntryData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -65,12 +78,28 @@ const StoreView: React.FC<{ storeId?: string }> = ({ storeId: storeIdProp }) => 
   const [showAddForm, setShowAddForm] = useState(false);
   const [addForm, setAddForm] = useState({ adults: 2, children: 0, seatType: 'TABLE' as 'TABLE' | 'COUNTER' | 'EITHER' });
   const [isAdding, setIsAdding] = useState(false);
+  const [guidingSinceById, setGuidingSinceById] = useState<Record<string, string>>({});
 
-  /* timer */
+  /* timer（呼び出し・案内の経過表示用に1秒） */
   useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 10000);
+    const t = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
+
+  useEffect(() => {
+    setGuidingSinceById((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      for (const id of Object.keys(next)) {
+        const g = customers.find((c) => c.id === id);
+        if (!g || g.status !== "CALLED") {
+          delete next[id];
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [customers]);
 
   /* data fetch */
   useEffect(() => {
@@ -104,7 +133,16 @@ const StoreView: React.FC<{ storeId?: string }> = ({ storeId: storeIdProp }) => 
     try { await updateQueueStatusApi(id, 'CALLED'); } catch (e: any) { setError(e.message); }
   };
   const handleDone = async (id: string) => {
-    try { await updateQueueStatusApi(id, 'DONE'); } catch (e: any) { setError(e.message); }
+    try {
+      await updateQueueStatusApi(id, "DONE");
+      setGuidingSinceById((s) => {
+        const n = { ...s };
+        delete n[id];
+        return n;
+      });
+    } catch (e: any) {
+      setError(e.message);
+    }
   };
   const handleHold = async (id: string) => {
     try { await updateQueueStatusApi(id, 'HOLD'); } catch (e: any) { setError(e.message); }
@@ -164,23 +202,75 @@ const StoreView: React.FC<{ storeId?: string }> = ({ storeId: storeIdProp }) => 
   }
 
   /* ─── status helpers ─── */
-  const statusBadge = (status: string) => {
-    if (status === 'CALLED') return <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-[#FD780F] text-white">呼び出し中</span>;
-    if (status === 'HOLD') return <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-[#FD780F] text-white">保留</span>;
+  const statusBadge = (guest: QueueEntryData) => {
+    if (guest.status === "CALLED") {
+      if (guidingSinceById[guest.id]) {
+        return (
+          <span className="rounded bg-[#22C55E] px-2 py-0.5 text-[10px] font-bold text-white">案内中</span>
+        );
+      }
+      return (
+        <span className="rounded bg-[#FD780F] px-2 py-0.5 text-[10px] font-bold text-white">案内待ち</span>
+      );
+    }
+    if (guest.status === "HOLD") {
+      return <span className="rounded bg-[#FD780F] px-2 py-0.5 text-[10px] font-bold text-white">保留</span>;
+    }
     return null;
   };
 
-  const statusCardClass = (status: string) => {
-    if (status === 'CALLED') return 'border-l-[6px] border-l-[#FD780F] bg-[#FFF7ED]';
-    return 'border-l-[6px] border-l-[#082752] bg-white';
+  const statusCardClass = (guest: QueueEntryData) => {
+    if (guest.status === "CALLED" && guidingSinceById[guest.id]) {
+      return "border-l-[6px] border-l-[#22C55E] bg-[#F0FDF4]";
+    }
+    if (guest.status === "CALLED") {
+      return "border-l-[6px] border-l-[#FD780F] bg-[#FFF7ED]";
+    }
+    return "border-l-[6px] border-l-[#082752] bg-white";
   };
 
   const actionButton = (guest: QueueEntryData) => {
-    if (guest.status === 'CALLED') {
+    if (guest.status === "CALLED") {
+      if (!guidingSinceById[guest.id]) {
+        return (
+          <button
+            type="button"
+            onClick={() =>
+              setGuidingSinceById((s) => ({ ...s, [guest.id]: new Date().toISOString() }))
+            }
+            className="flex h-full w-[120px] flex-col items-center justify-center rounded-r-2xl bg-[#082752] text-white transition-colors hover:bg-[#0a3060]"
+          >
+            <svg
+              className="mb-1 h-6 w-6"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M5 12h14" />
+              <path d="m12 5 7 7-7 7" />
+            </svg>
+            <span className="text-[11px] font-medium">案内する</span>
+          </button>
+        );
+      }
       return (
-        <button onClick={() => handleDone(guest.id)}
-          className="h-full w-[120px] flex flex-col items-center justify-center rounded-r-2xl bg-[#22C55E] text-white transition-colors hover:bg-[#16A34A]">
-          <svg className="w-7 h-7 mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <button
+          type="button"
+          onClick={() => void handleDone(guest.id)}
+          className="flex h-full w-[120px] flex-col items-center justify-center rounded-r-2xl bg-[#22C55E] text-white transition-colors hover:bg-[#16A34A]"
+        >
+          <svg
+            className="mb-1 h-7 w-7"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <path d="M20 6 9 17l-5-5" />
           </svg>
           <span className="text-xs font-bold">案内完了</span>
@@ -225,7 +315,12 @@ const StoreView: React.FC<{ storeId?: string }> = ({ storeId: storeIdProp }) => 
             </svg>
           </button>
           <img src="/etable-logo-white.svg" alt="ETABLE" width={120} height={24} className="h-6 w-auto" />
-          <button className="h-10 w-[88px] bg-white rounded-full text-[12px] font-semibold text-[#FD780F] inline-flex items-center justify-center">履歴</button>
+          <Link
+            href={`/history?storeId=${encodeURIComponent(storeId)}`}
+            className="inline-flex h-10 w-[88px] items-center justify-center rounded-full bg-white text-[12px] font-semibold text-[#FD780F]"
+          >
+            履歴
+          </Link>
         </div>
         <div className="flex items-end justify-between">
           <div>
@@ -277,12 +372,12 @@ const StoreView: React.FC<{ storeId?: string }> = ({ storeId: storeIdProp }) => 
           filteredGuests.map(guest => {
             const mins = elapsed(guest.arrivalTime, now);
             return (
-              <div key={guest.id} className={`rounded-2xl shadow-lg flex overflow-hidden relative ${statusCardClass(guest.status)}`}>
+              <div key={guest.id} className={`relative flex overflow-hidden rounded-2xl shadow-lg ${statusCardClass(guest)}`}>
                 {/* left content */}
-                <div className="flex-1 pr-2 pl-6 py-4">
-                  <div className="flex items-center gap-3 mb-2">
+                <div className="flex-1 py-4 pl-6 pr-2">
+                  <div className="mb-2 flex items-center gap-3">
                     <span className="text-[24px] font-bold text-[#082752]">No.{guest.ticketNumber}</span>
-                    {statusBadge(guest.status)}
+                    {statusBadge(guest)}
                     {/* 3-dot menu */}
                     <div className="relative ml-auto">
                       <button onClick={() => setOpenMenuId(openMenuId === guest.id ? null : guest.id)}
@@ -324,11 +419,46 @@ const StoreView: React.FC<{ storeId?: string }> = ({ storeId: storeIdProp }) => 
                     <span className="text-gray-300">|</span>
                     <span>{getSeatLabel(guest.seatType)}</span>
                   </div>
-                  {/* timer */}
-                  <div className="flex items-center gap-2 mt-3">
-                    <svg className="w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
-                    <span className={`text-sm font-bold tabular-nums ${mins > 15 ? 'text-[#EF4444]' : 'text-gray-600'}`}>{mins}分経過</span>
-                  </div>
+                  {/* 待機: 到着からの経過 */}
+                  {guest.status === "WAITING" && (
+                    <div className="mt-3 flex items-center gap-2">
+                      <svg className="h-4 w-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <circle cx="12" cy="12" r="10" />
+                        <path d="M12 6v6l4 2" />
+                      </svg>
+                      <span
+                        className={`text-sm font-bold tabular-nums ${mins > 15 ? "text-[#EF4444]" : "text-gray-600"}`}
+                      >
+                        {mins}分経過
+                      </span>
+                    </div>
+                  )}
+                  {guest.status === "CALLED" && guest.calledAt && !guidingSinceById[guest.id] && (
+                    <div className="mt-2 flex items-center gap-2">
+                      <span className="inline-flex h-[29px] min-w-[140px] items-center justify-center gap-0.5 rounded-full bg-[#FFF7ED] px-2 text-[10px] font-medium text-[#082752]">
+                        <svg className="mr-1 h-2.5 w-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                          <circle cx="12" cy="12" r="10" />
+                          <path d="M12 6v6l4 2" />
+                        </svg>
+                        <span className="whitespace-nowrap">
+                          呼び出しから {formatElapsedSince(guest.calledAt, now)}
+                        </span>
+                      </span>
+                    </div>
+                  )}
+                  {guest.status === "CALLED" && guidingSinceById[guest.id] && (
+                    <div className="mt-2 flex items-center gap-2">
+                      <span className="inline-flex h-[29px] min-w-[140px] items-center justify-center gap-0.5 rounded-full bg-[#DCFCE7] px-2 text-[10px] font-medium text-[#166534]">
+                        <svg className="mr-1 h-2.5 w-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                          <circle cx="12" cy="12" r="10" />
+                          <path d="M12 6v6l4 2" />
+                        </svg>
+                        <span className="whitespace-nowrap">
+                          案内から {formatElapsedSince(guidingSinceById[guest.id], now)}
+                        </span>
+                      </span>
+                    </div>
+                  )}
                 </div>
                 {/* right action */}
                 <div className="flex-shrink-0">
@@ -483,9 +613,20 @@ const StoreView: React.FC<{ storeId?: string }> = ({ storeId: storeIdProp }) => 
                 </div>
               </div>
             </div>
-            <div className="p-6 border-t border-gray-100">
-              <button className="w-full flex items-center justify-center gap-2 px-4 py-4 bg-gray-100 text-gray-400 rounded-xl hover:bg-gray-200 transition-colors">
-                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>
+            <div className="border-t border-gray-100 p-6">
+              <button
+                type="button"
+                onClick={() => {
+                  setSidebarOpen(false);
+                  onLogout?.();
+                }}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-gray-100 px-4 py-4 text-gray-400 transition-colors hover:bg-gray-200"
+              >
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
                 <span className="font-medium tracking-widest">LOGOUT</span>
               </button>
             </div>

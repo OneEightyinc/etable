@@ -35,6 +35,7 @@ export {
   deleteCustomerProfile,
   addSurveyResponse,
   getSurveyResponses,
+  isStoreIdRecognized,
 } from './db';
 
 export type {

@@ -842,6 +842,26 @@ export async function addSurveyResponse(data: Omit<SurveyResponse, "id" | "visit
   return row;
 }
 
+/** YYYY-MM-DD のときはその日の UTC 0:00〜23:59:59.999 で比較（文字列比較だけだと to 当日分が落ちる） */
+function surveyDateRangeBounds(from?: string, to?: string): { fromIso?: string; toIso?: string } {
+  const dayOnly = /^\d{4}-\d{2}-\d{2}$/;
+  return {
+    fromIso: from && dayOnly.test(from) ? `${from}T00:00:00.000Z` : from,
+    toIso: to && dayOnly.test(to) ? `${to}T23:59:59.999Z` : to,
+  };
+}
+
+/**
+ * マスタに店舗行が無くても、キュー or アンケートに該当 storeId があれば分析 API で扱う（レガシー店舗ID向け）
+ */
+export async function isStoreIdRecognized(storeId: string): Promise<boolean> {
+  const db = await readDatabase();
+  if ((db.accounts ?? []).some((a) => a.id === storeId)) return true;
+  if ((db.queue ?? []).some((q) => q.storeId === storeId)) return true;
+  if ((db.surveyResponses ?? []).some((r) => r.storeId === storeId)) return true;
+  return false;
+}
+
 export async function getSurveyResponses(
   storeId: string,
   from?: string,
@@ -849,10 +869,11 @@ export async function getSurveyResponses(
 ): Promise<SurveyResponse[]> {
   const db = await readDatabase();
   if (!db.surveyResponses) return [];
+  const { fromIso, toIso } = surveyDateRangeBounds(from, to);
   return db.surveyResponses.filter((r) => {
     if (r.storeId !== storeId) return false;
-    if (from && r.visitedAt < from) return false;
-    if (to && r.visitedAt > to) return false;
+    if (fromIso && r.visitedAt < fromIso) return false;
+    if (toIso && r.visitedAt > toIso) return false;
     return true;
   });
 }

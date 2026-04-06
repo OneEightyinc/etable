@@ -5,9 +5,10 @@ const monorepoRoot = path.join(__dirname, "..", "..");
 
 const nextConfig: NextConfig = {
   assetPrefix: process.env.VERCEL ? "https://store-admin-v2-rosy.vercel.app" : undefined,
-  env: {
-    NEXT_PUBLIC_API_PREFIX: "/store",
-  },
+  /**
+   * 同一オリジンでは空のまま `/api/*` を使う（localhost:3020 や etable-1yex のルート配信）。
+   * リバースプロキシで `/store` 以下にマウントする場合のみ Vercel 等で NEXT_PUBLIC_API_PREFIX=/store を設定。
+   */
   transpilePackages: ["@queue-platform/api"],
   outputFileTracingRoot: monorepoRoot,
   outputFileTracingIncludes: {

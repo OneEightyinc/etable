@@ -87,7 +87,8 @@ export default function SurveyDashboard({ storeId }: SurveyDashboardProps) {
         `${prefix}/api/analytics/survey?storeId=${encodeURIComponent(storeId)}&from=${from}&to=${to}`
       );
       if (!res.ok) {
-        throw new Error(`API error: ${res.status}`);
+        const body = await res.json().catch(() => ({} as { error?: string }));
+        throw new Error(body.error || `通信エラー (${res.status})`);
       }
       const json = await res.json();
       setData(json);

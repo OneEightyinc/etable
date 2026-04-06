@@ -6,8 +6,10 @@ import RestaurantCard from "../components/home/RestaurantCard";
 import { getFavorites, type FavoriteItem } from "../lib/storage";
 import { fetchPortalRestaurant, restaurantFromFavorite } from "../lib/portalRestaurant";
 import type { Restaurant } from "../data/restaurants";
+import { useUserLocation, computeDistance } from "../lib/geo";
 
 const Favorites: React.FC = () => {
+  const userLoc = useUserLocation();
   const [ready, setReady] = useState(false);
   const [favItems, setFavItems] = useState<FavoriteItem[]>([]);
   const [rows, setRows] = useState<Restaurant[]>([]);
@@ -99,7 +101,7 @@ const Favorites: React.FC = () => {
                   category: restaurant.category,
                   imageUrl: restaurant.imageUrl,
                   rating: restaurant.rating,
-                  distance: restaurant.distance,
+                  distance: computeDistance(restaurant.lat, restaurant.lng, userLoc, restaurant.distance),
                   waitingGroups: restaurant.waitingGroups,
                   estimatedWaitMinutes: Math.max(1, restaurant.shortestWaitMinutes || 1),
                 }}

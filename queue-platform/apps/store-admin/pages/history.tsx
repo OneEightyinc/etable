@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
+import { storeScopedPath } from '../lib/storePaths';
+import { useStoreAdminPublicToken } from '../lib/StoreAdminPublicTokenContext';
 
 interface HistoryItem {
   id: string;
@@ -35,6 +37,7 @@ function calcWaitMinutes(arrival: string, done: string): number {
 
 export default function History() {
   const router = useRouter();
+  const publicToken = useStoreAdminPublicToken();
   const storeId = (router.query.storeId as string) || 'shibuya-001';
 
   const [activeTab, setActiveTab] = useState<'all' | 'completed' | 'cancelled'>('all');
@@ -43,7 +46,9 @@ export default function History() {
 
   const fetchHistory = useCallback(async () => {
     try {
-      const res = await fetch(`/api/queue/history?storeId=${storeId}`);
+      const res = await fetch(`/api/queue/history?storeId=${encodeURIComponent(storeId)}`, {
+        credentials: "include",
+      });
       const data = await res.json();
       setHistory(
         (data.history || []).map((h: any) => ({
@@ -64,9 +69,10 @@ export default function History() {
 
   const handleRestore = async (id: string) => {
     try {
-      await fetch(`/api/queue/${id}`, {
+      await fetch(`/api/queue/${encodeURIComponent(id)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ status: 'WAITING' }),
       });
       // Remove from history list
@@ -92,7 +98,7 @@ export default function History() {
       {/* Header */}
       <header className="sticky top-0 bg-white border-b border-[#EEF2F7] px-6 py-5 z-10">
         <div className="grid grid-cols-[56px_1fr_56px] items-center">
-          <Link href={`/?storeId=${storeId}`} className="w-10 h-10 flex items-center justify-center">
+          <Link href={storeScopedPath(publicToken, '/', storeId)} className="w-10 h-10 flex items-center justify-center">
             <svg
               className="w-6 h-6 text-[#0F274D]"
               viewBox="0 0 24 24"

@@ -41,9 +41,15 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
 
       <div className="w-full max-w-md relative z-10 animate-in fade-in slide-in-from-bottom-8 duration-700 pt-16 lg:pt-24">
         {/* Logo Area - CIRCLX Style */}
-        <div className="flex flex-col items-center mb-10 text-center">
-          <div className="select-none">
-            <img src={`${process.env.NEXT_PUBLIC_API_PREFIX || ''}/circlx_black.svg`} alt="CIRCLX" width={240} height={80} className="h-20 w-[240px]" />
+        <div className="flex flex-col items-center mb-10 text-center px-2">
+          <div className="select-none flex w-full max-w-[320px] justify-center overflow-visible">
+            <img
+              src="/circlx_black.svg"
+              alt="CIRCLX"
+              width={489}
+              height={82}
+              className="h-auto w-full max-h-[92px] object-contain object-center"
+            />
           </div>
           <p className="mt-5 text-[10px] font-avenir font-bold uppercase tracking-[0.4em] text-slate-400">
             MANAGEMENT SYSTEM

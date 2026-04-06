@@ -84,7 +84,8 @@ export default function SurveyDashboard({ storeId }: SurveyDashboardProps) {
 
     try {
       const res = await fetch(
-        `${prefix}/api/analytics/survey?storeId=${encodeURIComponent(storeId)}&from=${from}&to=${to}`
+        `${prefix}/api/analytics/survey?storeId=${encodeURIComponent(storeId)}&from=${from}&to=${to}`,
+        { credentials: "include" }
       );
       if (!res.ok) {
         const body = await res.json().catch(() => ({} as { error?: string }));

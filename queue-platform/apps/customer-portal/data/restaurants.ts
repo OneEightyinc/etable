@@ -7,6 +7,8 @@ export type Restaurant = {
   rating: number;
   priceRange: string;
   distance: string;
+  lat: number | null;
+  lng: number | null;
   waitingGroups: number;
   shortestWaitMinutes: number;
   approxWaitText: string;

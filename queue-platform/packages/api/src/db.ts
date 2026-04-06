@@ -17,6 +17,11 @@ export interface AdminUser {
   createdAt: string;
 }
 
+/** 店舗ごとに独立した推測困難なURL用トークン（マスタが発行・一覧に表示） */
+export type PublicUrlTokenKind = "storeAdmin" | "kiosk" | "portal" | "survey";
+
+export type PublicUrlTokens = Record<PublicUrlTokenKind, string>;
+
 export interface Account {
   id: string;
   name: string;
@@ -26,6 +31,8 @@ export interface Account {
   status: "ACTIVE" | "DISABLED";
   createdAt: string;
   updatedAt: string;
+  /** 未設定の既存データは read 時に自動採番 */
+  publicUrlTokens?: Partial<PublicUrlTokens>;
 }
 
 export interface QueueEntry {
@@ -69,6 +76,8 @@ export interface StoreSettings {
   portalDescription: string;
   portalAddress: string;
   portalDistanceLabel: string;
+  portalLat: number | null;
+  portalLng: number | null;
   portalRating: number;
   portalPriceRange: string;
   /** 未入力時は businessHours から自動整形 */
@@ -119,6 +128,8 @@ export type StorePortalProfile = {
   description: string;
   address: string;
   distance: string;
+  lat: number | null;
+  lng: number | null;
   rating: number;
   priceRange: string;
   hours: string;
@@ -182,6 +193,39 @@ function getDbPath(): string {
 export function hashPassword(password: string): string {
   const p = password ?? "";
   return crypto.createHash("sha256").update(p, "utf8").digest("hex");
+}
+
+const PUBLIC_URL_KINDS: PublicUrlTokenKind[] = ["storeAdmin", "kiosk", "portal", "survey"];
+
+function newPublicOpaqueToken(): string {
+  return crypto.randomBytes(32).toString("hex");
+}
+
+/** アカウントに不足している publicUrlTokens を埋める。変更があれば true */
+function ensureAccountPublicTokens(account: Account): boolean {
+  if (!account.publicUrlTokens || typeof account.publicUrlTokens !== "object") {
+    account.publicUrlTokens = {};
+  }
+  const t = account.publicUrlTokens;
+  let changed = false;
+  for (const k of PUBLIC_URL_KINDS) {
+    const v = t[k];
+    if (typeof v !== "string" || v.length < 32) {
+      t[k] = newPublicOpaqueToken();
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+async function ensureAllAccountsPublicTokens(): Promise<void> {
+  const db = globalForDb._queueDb;
+  if (!db?.accounts?.length) return;
+  let changed = false;
+  for (const a of db.accounts) {
+    if (ensureAccountPublicTokens(a)) changed = true;
+  }
+  if (changed) await persistDatabase();
 }
 
 function getDefaultDb(): Database {
@@ -261,8 +305,8 @@ function normalizeDatabase(raw: unknown): Database {
 
 const globalForDb = globalThis as unknown as { _queueDb?: Database };
 
-function loadDbFromFile(): Database {
-  if (globalForDb._queueDb) return globalForDb._queueDb;
+function loadDbFromFile(forceReload = false): Database {
+  if (!forceReload && globalForDb._queueDb) return globalForDb._queueDb;
 
   const dbPath = getDbPath();
 
@@ -290,13 +334,38 @@ export async function readDatabase(): Promise<Database> {
     if (raw) {
       const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
       globalForDb._queueDb = normalizeDatabase(parsed);
+      await ensureAllAccountsPublicTokens();
       return globalForDb._queueDb!;
     }
     globalForDb._queueDb = getDefaultDb();
     await persistDatabase();
+    await ensureAllAccountsPublicTokens();
     return globalForDb._queueDb!;
   }
-  return loadDbFromFile();
+  const fileDb = loadDbFromFile(true);
+  await ensureAllAccountsPublicTokens();
+  return fileDb;
+}
+
+/**
+ * 不透明トークンから店舗IDを解決（ACTIVE のみ）
+ */
+export async function resolvePublicUrlToken(
+  kind: PublicUrlTokenKind,
+  token: string
+): Promise<string | null> {
+  const raw = typeof token === "string" ? token.trim() : "";
+  /** hex トークンは DB と URL で表記ゆれしうるため小文字に正規化 */
+  const t = raw.toLowerCase();
+  if (t.length < 32) return null;
+  const db = await readDatabase();
+  const acc = db.accounts.find((a) => {
+    if (a.status !== "ACTIVE") return false;
+    const stored = a.publicUrlTokens?.[kind];
+    if (typeof stored !== "string") return false;
+    return stored.toLowerCase() === t;
+  });
+  return acc ? acc.id : null;
 }
 
 function saveDbSync(): void {
@@ -407,6 +476,12 @@ export async function createAccount(data: {
     status: data.status,
     createdAt: now,
     updatedAt: now,
+    publicUrlTokens: {
+      storeAdmin: newPublicOpaqueToken(),
+      kiosk: newPublicOpaqueToken(),
+      portal: newPublicOpaqueToken(),
+      survey: newPublicOpaqueToken(),
+    },
   };
   db.accounts.push(account);
   await persistDatabase();
@@ -611,6 +686,8 @@ function getDefaultStoreSettings(storeId: string): StoreSettings {
     portalDescription: "",
     portalAddress: "",
     portalDistanceLabel: "",
+    portalLat: null,
+    portalLng: null,
     portalRating: 4.5,
     portalPriceRange: "¥1,000〜¥3,000",
     portalHoursSummary: "",
@@ -642,12 +719,33 @@ function formatPortalHours(s: StoreSettings): string {
 
 const FALLBACK_PORTAL_IMAGE = "https://picsum.photos/seed/etable-portal/400/300";
 
+const AGE_LABELS: Record<string, string> = {
+  teens: "10代", "20s_early": "20代前半", "20s_late": "20代後半",
+  "30s_early": "30代前半", "30s_late": "30代後半", "40s": "40代", "50s_plus": "50代以上",
+};
+
+function buildReviewsFromSurveys(
+  surveys: SurveyResponse[],
+  storeId: string
+): { author: string; rating: number; comment: string }[] {
+  return surveys
+    .filter((s) => s.storeId === storeId && s.etableReview?.trim())
+    .sort((a, b) => new Date(b.visitedAt).getTime() - new Date(a.visitedAt).getTime())
+    .slice(0, 20)
+    .map((s) => ({
+      author: AGE_LABELS[s.ageGroup] ?? "お客様",
+      rating: Math.min(5, Math.max(1, s.satisfactionScore)),
+      comment: s.etableReview!.trim(),
+    }));
+}
+
 function storePortalProfileFromParts(
   storeId: string,
   account: Account,
   s: StoreSettings,
   waitingGroups: number,
-  estimated: number
+  estimated: number,
+  reviews: { author: string; rating: number; comment: string }[]
 ): StorePortalProfile {
   const approxWaitText = waitingGroups === 0 ? "空いています" : `約${estimated}分`;
   const name = s.portalDisplayName?.trim() || account.storeName;
@@ -661,12 +759,14 @@ function storePortalProfileFromParts(
     description: s.portalDescription?.trim() || "",
     address: s.portalAddress?.trim() || "",
     distance: s.portalDistanceLabel?.trim() || "—",
+    lat: s.portalLat ?? null,
+    lng: s.portalLng ?? null,
     rating: Math.min(5, Math.max(0, s.portalRating)),
     priceRange: s.portalPriceRange?.trim() || "—",
     hours: formatPortalHours(s),
     businessHours: s.businessHours,
     menu: s.portalMenuItems,
-    reviews: s.portalReviews,
+    reviews,
     waitingGroups,
     approxWaitText,
     shortestWaitMinutes: estimated,
@@ -687,7 +787,8 @@ function buildPortalProfileFromDbSnapshot(db: Database, account: Account): Store
   const s = normalizeStoreSettings(raw);
   const queue = getActiveQueueForStore(db, account.id);
   const { waitingCount: waitingGroups, estimatedWait: estimated } = queueStatsFromActiveQueue(queue);
-  return storePortalProfileFromParts(account.id, account, s, waitingGroups, estimated);
+  const reviews = buildReviewsFromSurveys(db.surveyResponses || [], account.id);
+  return storePortalProfileFromParts(account.id, account, s, waitingGroups, estimated, reviews);
 }
 
 /**
@@ -770,6 +871,8 @@ export async function updateStoreSettings(
   if (data.portalDescription !== undefined) settings.portalDescription = data.portalDescription;
   if (data.portalAddress !== undefined) settings.portalAddress = data.portalAddress;
   if (data.portalDistanceLabel !== undefined) settings.portalDistanceLabel = data.portalDistanceLabel;
+  if (data.portalLat !== undefined) settings.portalLat = data.portalLat;
+  if (data.portalLng !== undefined) settings.portalLng = data.portalLng;
   if (data.portalRating !== undefined) settings.portalRating = data.portalRating;
   if (data.portalPriceRange !== undefined) settings.portalPriceRange = data.portalPriceRange;
   if (data.portalHoursSummary !== undefined) settings.portalHoursSummary = data.portalHoursSummary;

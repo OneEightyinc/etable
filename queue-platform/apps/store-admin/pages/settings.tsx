@@ -2,6 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { compressImageForPortal } from '../lib/compressImageForPortal';
+import { storeScopedPath } from '../lib/storePaths';
+import { useStoreAdminPublicToken } from '../lib/StoreAdminPublicTokenContext';
+import GlassModal from '../components/GlassModal';
 
 interface BusinessHour {
   id: string;
@@ -43,6 +46,7 @@ interface StoreSettings {
 
 export default function SettingsPage() {
   const router = useRouter();
+  const publicToken = useStoreAdminPublicToken();
   const storeId = (router.query.storeId as string) || 'shibuya-001';
 
   const [businessHours, setBusinessHours] = useState<BusinessHour[]>([]);
@@ -59,15 +63,18 @@ export default function SettingsPage() {
   const [portalDescription, setPortalDescription] = useState('');
   const [portalAddress, setPortalAddress] = useState('');
   const [portalDistanceLabel, setPortalDistanceLabel] = useState('');
+  const [portalLat, setPortalLat] = useState('');
+  const [portalLng, setPortalLng] = useState('');
   const [portalRating, setPortalRating] = useState(4.5);
   const [portalPriceRange, setPortalPriceRange] = useState('¥1,000〜¥3,000');
   const [portalHoursSummary, setPortalHoursSummary] = useState('');
   const [portalMenuItems, setPortalMenuItems] = useState<MenuRow[]>([{ name: '', price: '' }]);
-  const [portalReviewsJson, setPortalReviewsJson] = useState('[]');
+
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
+  const [showSaveConfirm, setShowSaveConfirm] = useState(false);
   const [portalImageBusy, setPortalImageBusy] = useState(false);
   const portalImageInputRef = useRef<HTMLInputElement>(null);
 
@@ -82,7 +89,7 @@ export default function SettingsPage() {
   const [newClosedDay, setNewClosedDay] = useState('');
 
   useEffect(() => {
-    fetch(`/api/settings?storeId=${storeId}`)
+    fetch(`/api/settings?storeId=${encodeURIComponent(storeId)}`, { credentials: "include" })
       .then(res => res.json())
       .then(data => {
         const s = data.settings;
@@ -99,6 +106,8 @@ export default function SettingsPage() {
         setPortalDescription(s.portalDescription ?? '');
         setPortalAddress(s.portalAddress ?? '');
         setPortalDistanceLabel(s.portalDistanceLabel ?? '');
+        setPortalLat(s.portalLat != null ? String(s.portalLat) : '');
+        setPortalLng(s.portalLng != null ? String(s.portalLng) : '');
         setPortalRating(typeof s.portalRating === 'number' ? s.portalRating : 4.5);
         setPortalPriceRange(s.portalPriceRange ?? '¥1,000〜¥3,000');
         setPortalHoursSummary(s.portalHoursSummary ?? '');
@@ -108,9 +117,6 @@ export default function SettingsPage() {
             ? menus.map((m: MenuRow) => ({ name: m.name, price: m.price }))
             : [{ name: '', price: '' }]
         );
-        setPortalReviewsJson(
-          s.portalReviews && s.portalReviews.length > 0 ? JSON.stringify(s.portalReviews, null, 2) : '[]'
-        );
       })
       .catch(() => {})
       .finally(() => setIsLoading(false));
@@ -119,20 +125,6 @@ export default function SettingsPage() {
   const handleSave = async () => {
     setIsSaving(true);
     setSaveMessage('');
-    let portalReviews: { author: string; rating: number; comment: string }[] = [];
-    try {
-      const parsed = JSON.parse(portalReviewsJson || '[]');
-      if (!Array.isArray(parsed)) throw new Error('invalid');
-      portalReviews = parsed.map((r: { author?: string; rating?: number; comment?: string }) => ({
-        author: String(r.author ?? ''),
-        rating: Math.min(5, Math.max(0, Number(r.rating) || 0)),
-        comment: String(r.comment ?? ''),
-      }));
-    } catch {
-      setSaveMessage('口コミの JSON 形式が正しくありません（配列で author, rating, comment）');
-      setIsSaving(false);
-      return;
-    }
 
     const portalTags = portalTagsCsv
       .split(',')
@@ -146,6 +138,7 @@ export default function SettingsPage() {
       const res = await fetch('/api/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           storeId,
           businessHours,
@@ -161,11 +154,12 @@ export default function SettingsPage() {
           portalDescription,
           portalAddress,
           portalDistanceLabel,
+          portalLat: portalLat.trim() ? parseFloat(portalLat) : null,
+          portalLng: portalLng.trim() ? parseFloat(portalLng) : null,
           portalRating: Math.min(5, Math.max(0, portalRating)),
           portalPriceRange,
           portalHoursSummary,
           portalMenuItems: menuPayload,
-          portalReviews,
         }),
       });
       if (!res.ok) {
@@ -231,7 +225,7 @@ export default function SettingsPage() {
         <div className="w-8" />
         <h1 className="text-base font-bold text-[#082752]">設定</h1>
         <Link
-          href={`/?storeId=${storeId}`}
+          href={storeScopedPath(publicToken, "/", storeId)}
           className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -592,13 +586,25 @@ export default function SettingsPage() {
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs text-gray-500">距離表示（任意・例: 1.2km）</label>
-              <input
-                type="text"
-                value={portalDistanceLabel}
-                onChange={(e) => setPortalDistanceLabel(e.target.value)}
-                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-[#FD780F]"
-              />
+              <label className="mb-1 block text-xs text-gray-500">店舗の位置情報（顧客との距離を自動計算）</label>
+              <div className="grid grid-cols-2 gap-3">
+                <input
+                  type="number"
+                  step="any"
+                  placeholder="緯度（例: 35.6812）"
+                  value={portalLat}
+                  onChange={(e) => setPortalLat(e.target.value)}
+                  className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-[#FD780F]"
+                />
+                <input
+                  type="number"
+                  step="any"
+                  placeholder="経度（例: 139.7671）"
+                  value={portalLng}
+                  onChange={(e) => setPortalLng(e.target.value)}
+                  className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-[#FD780F]"
+                />
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -683,16 +689,6 @@ export default function SettingsPage() {
                 ))}
               </div>
             </div>
-            <div>
-              <label className="mb-1 block text-xs text-gray-500">口コミ（JSON 配列）</label>
-              <textarea
-                value={portalReviewsJson}
-                onChange={(e) => setPortalReviewsJson(e.target.value)}
-                rows={6}
-                className="w-full resize-none rounded-xl border border-gray-200 px-4 py-3 font-mono text-xs outline-none focus:border-[#FD780F]"
-                placeholder='[{"author":"名前","rating":5,"comment":"本文"}]'
-              />
-            </div>
           </div>
         </div>
 
@@ -716,6 +712,16 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      {showSaveConfirm && (
+        <GlassModal
+          title="設定を保存"
+          message="現在の設定内容を保存します。よろしいですか？"
+          confirmText="保存する"
+          onConfirm={() => { setShowSaveConfirm(false); handleSave(); }}
+          onClose={() => setShowSaveConfirm(false)}
+        />
+      )}
+
       {/* Fixed Footer */}
       <div className="fixed bottom-0 left-0 right-0 px-4 pb-6 pt-3 bg-white border-t border-gray-100">
         <div className="max-w-md mx-auto">
@@ -726,13 +732,13 @@ export default function SettingsPage() {
           )}
           <div className="flex gap-3">
             <Link
-              href={`/?storeId=${storeId}`}
+              href={storeScopedPath(publicToken, "/", storeId)}
               className="flex-1 py-3 rounded-2xl border border-gray-200 text-sm font-medium text-[#082752] bg-white text-center hover:bg-gray-50 transition-colors"
             >
               キャンセル
             </Link>
             <button
-              onClick={handleSave}
+              onClick={() => setShowSaveConfirm(true)}
               disabled={isSaving}
               className="flex-1 py-3 rounded-2xl bg-[#082752] text-sm font-medium text-white hover:bg-[#0a3366] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
             >

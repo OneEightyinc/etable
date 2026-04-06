@@ -36,11 +36,14 @@ export {
   addSurveyResponse,
   getSurveyResponses,
   isStoreIdRecognized,
+  resolvePublicUrlToken,
 } from './db';
 
 export type {
   AdminUser,
   Account,
+  PublicUrlTokenKind,
+  PublicUrlTokens,
   QueueEntry,
   StoreSettings,
   StorePortalProfile,

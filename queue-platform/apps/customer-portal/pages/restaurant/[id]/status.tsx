@@ -258,18 +258,19 @@ const ReservationStatusPage: React.FC = () => {
 
           {/* Orange Status Block */}
           <section className="mb-4 rounded-[30px] bg-[#ff6b00] px-8 py-8 text-white shadow-[0_14px_28px_rgba(255,107,0,0.22)]">
-            <div className="flex items-end justify-center gap-2">
-              <span className="text-[84px] font-bold leading-none tracking-[-2px]">{waitingGroups}</span>
-              <span className="pb-3 text-[24px] font-bold">組待ち</span>
-            </div>
-            {waitingGroups === 0 && (
-              <p className="-mt-1 text-center text-[15px] font-semibold text-white/95">あなたの前にお待ちの組はありません</p>
+            {waitingGroups === 0 ? (
+              <p className="text-center text-[36px] font-bold leading-tight">まもなく<br />ご案内</p>
+            ) : (
+              <div className="flex items-end justify-center gap-2">
+                <span className="text-[84px] font-bold leading-none tracking-[-2px]">{waitingGroups}</span>
+                <span className="pb-3 text-[24px] font-bold">組待ち</span>
+              </div>
             )}
             <div className="my-7 h-px bg-white/25" />
             <div className="grid grid-cols-2 text-center">
               <div>
                 <p className="mb-2 text-[12px] font-medium text-white/85">待ち時間の目安</p>
-                <p className="text-[18px] font-bold">約{waitMinutes}分</p>
+                <p className="text-[18px] font-bold">{waitingGroups === 0 ? "まもなく" : `約${waitMinutes}分`}</p>
               </div>
               <div className="border-l border-white/25">
                 <p className="mb-2 text-[12px] font-medium text-white/85">通知設定</p>

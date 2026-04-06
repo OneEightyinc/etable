@@ -2,12 +2,46 @@ import React, { useState } from "react";
 import Image from "next/image";
 
 type Props = {
-  onLogin: () => void;
+  /** ログイン API 成功後（クッキー設定済み） */
+  onLoginSuccess: () => void;
+  /** URL から渡された店舗ID（この店舗のアカウントであることをサーバーで検証） */
+  storeIdHint?: string;
+  /** 直前に URL とセッションが不一致だった場合など */
+  bannerError?: string;
 };
 
-const StoreLoginScreen: React.FC<Props> = ({ onLogin }) => {
+const StoreLoginScreen: React.FC<Props> = ({ onLoginSuccess, storeIdHint, bannerError }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async () => {
+    setError("");
+    setLoading(true);
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          email,
+          password,
+          expectedStoreId: storeIdHint || undefined,
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setError(data.error || "ログインに失敗しました");
+        return;
+      }
+      onLoginSuccess();
+    } catch {
+      setError("通信エラーが発生しました");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="flex min-h-screen flex-col items-center bg-white px-6">
@@ -20,9 +54,20 @@ const StoreLoginScreen: React.FC<Props> = ({ onLogin }) => {
           className="mb-3 h-[44px] w-auto"
           priority
         />
-        <p className="login-subtitle mb-10 text-left text-[11px] font-black uppercase tracking-[0.35em] text-gray-300">
+        <p
+          className={`login-subtitle text-left text-[11px] font-black uppercase tracking-[0.35em] text-gray-300 ${storeIdHint ? "mb-2" : "mb-10"}`}
+        >
           PREMIUM WAITLIST APP
         </p>
+        {bannerError ? (
+          <p className="mb-4 rounded-xl bg-amber-50 px-3 py-2 text-left text-[12px] font-medium text-amber-900">{bannerError}</p>
+        ) : null}
+        {storeIdHint ? (
+          <p className="mb-10 text-left text-[13px] font-bold text-[#082752]/80">
+            店舗ID: <span className="font-mono tracking-tight">{storeIdHint}</span>
+            <span className="mt-1 block text-[11px] font-medium text-gray-400">この店舗の担当アカウントでログインしてください</span>
+          </p>
+        ) : null}
 
         <div className="w-full space-y-4">
           <div className="flex h-[64px] items-center gap-3 rounded-2xl bg-gray-50 px-4">
@@ -41,6 +86,7 @@ const StoreLoginScreen: React.FC<Props> = ({ onLogin }) => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full bg-transparent pr-2 text-sm text-gray-700 outline-none"
+                autoComplete="username"
               />
             </div>
           </div>
@@ -61,17 +107,21 @@ const StoreLoginScreen: React.FC<Props> = ({ onLogin }) => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full bg-transparent pr-2 text-sm text-gray-700 outline-none"
+                autoComplete="current-password"
               />
             </div>
           </div>
         </div>
 
+        {error ? <p className="mt-3 text-sm font-medium text-red-600">{error}</p> : null}
+
         <button
           type="button"
-          onClick={onLogin}
-          className="mt-6 flex h-[64px] w-full items-center justify-center gap-3 rounded-full bg-[#FD780F] font-semibold text-white transition-transform active:scale-[0.99]"
+          onClick={() => void handleSubmit()}
+          disabled={loading}
+          className="mt-6 flex h-[64px] w-full items-center justify-center gap-3 rounded-full bg-[#FD780F] font-semibold text-white transition-transform enabled:active:scale-[0.99] disabled:opacity-60"
         >
-          ログイン
+          {loading ? "ログイン中…" : "ログイン"}
           <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
             <path d="M5 12h14" strokeWidth="2" />
             <path d="m13 18 6-6-6-6" strokeWidth="2" />

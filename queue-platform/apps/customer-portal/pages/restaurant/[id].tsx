@@ -5,14 +5,20 @@ import AppHeader from "../../components/common/AppHeader";
 import BottomNavigation from "../../components/common/BottomNavigation";
 import { getFavorites, addFavorite, removeFavorite } from "../../lib/storage";
 import { useRestaurantById } from "../../lib/useRestaurantById";
+import { useUserLocation, computeDistance } from "../../lib/geo";
 
 type TabType = "detail" | "menu" | "reviews";
 
 const RestaurantDetail: React.FC = () => {
   const router = useRouter();
+  const userLoc = useUserLocation();
   const id = router.query.id;
   const idStr = typeof id === "string" ? id : undefined;
-  const { restaurant, loading } = useRestaurantById(idStr);
+  const { restaurant: rawRestaurant, loading } = useRestaurantById(idStr);
+  const restaurant = rawRestaurant ? {
+    ...rawRestaurant,
+    distance: computeDistance(rawRestaurant.lat, rawRestaurant.lng, userLoc, rawRestaurant.distance),
+  } : null;
   const [activeTab, setActiveTab] = useState<TabType>("detail");
   const [isFavorited, setIsFavorited] = useState(false);
   const [isClient, setIsClient] = useState(false);

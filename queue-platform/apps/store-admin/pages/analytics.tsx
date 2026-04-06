@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import SurveyDashboard from "../components/analytics/SurveyDashboard";
+import { storeScopedPath } from "../lib/storePaths";
+import { useStoreAdminPublicToken } from "../lib/StoreAdminPublicTokenContext";
 import {
   computeQueueAnalytics,
   buildCongestionChartPaths,
@@ -14,6 +16,7 @@ const CHART_H = 160;
 
 export default function AnalyticsPage() {
   const router = useRouter();
+  const publicToken = useStoreAdminPublicToken();
   const rawSid = router.query.storeId;
   const storeIdFromQuery =
     router.isReady && rawSid ? (Array.isArray(rawSid) ? rawSid[0] : rawSid) : undefined;
@@ -31,7 +34,9 @@ export default function AnalyticsPage() {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    fetch(`${apiPrefix}/api/queue/history?storeId=${encodeURIComponent(storeId)}`)
+    fetch(`${apiPrefix}/api/queue/history?storeId=${encodeURIComponent(storeId)}`, {
+      credentials: "include",
+    })
       .then(async (res) => {
         if (!res.ok) throw new Error(`履歴の取得に失敗しました (${res.status})`);
         const json = (await res.json()) as { history: TerminalQueueEntry[] };
@@ -61,7 +66,7 @@ export default function AnalyticsPage() {
     [data.chartCounts]
   );
 
-  const homeHref = `/?storeId=${encodeURIComponent(storeId)}`;
+  const homeHref = storeScopedPath(publicToken, "/", storeId);
 
   return (
     <div className="min-h-screen bg-[#F9FAFB]">

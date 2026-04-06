@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { updateQueueStatus, removeFromQueue, getQueueEntryById, getQueueByStore, broadcastToStore } from '@queue-platform/api/src/server';
+import { requireStoreAdminForStore } from '../../../lib/requireStoreAdminForStore';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { id } = req.query;
@@ -8,6 +9,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method === 'GET') {
     const entry = await getQueueEntryById(id);
     if (!entry) return res.status(404).json({ error: 'Entry not found' });
+    if (!requireStoreAdminForStore(req, res, entry.storeId)) return;
     return res.status(200).json({ entry });
   }
 
@@ -16,6 +18,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!status || !['WAITING', 'CALLED', 'HOLD', 'DONE', 'CANCELLED'].includes(status)) {
       return res.status(400).json({ error: 'Invalid status' });
     }
+    const existing = await getQueueEntryById(id);
+    if (!existing) return res.status(404).json({ error: 'Entry not found' });
+    if (!requireStoreAdminForStore(req, res, existing.storeId)) return;
     try {
       const entry = await updateQueueStatus(id, status);
       const queue = await getQueueByStore(entry.storeId);
@@ -29,6 +34,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method === 'DELETE') {
     const entry = await getQueueEntryById(id);
     if (!entry) return res.status(404).json({ error: 'Entry not found' });
+    if (!requireStoreAdminForStore(req, res, entry.storeId)) return;
     await removeFromQueue(id);
     const queue = await getQueueByStore(entry.storeId);
     broadcastToStore(entry.storeId, 'queue_update', { type: 'REMOVED', entryId: id, queue });

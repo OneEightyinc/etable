@@ -9,7 +9,13 @@ import {
   type AccountData,
 } from '@queue-platform/api';
 import { useAppBaseUrls } from '../hooks/useAppBaseUrls';
-import { appendStoreQuery, isLocalHostname, surveyUrlForStore } from '../lib/publicAppUrls';
+import {
+  isLocalHostname,
+  kioskEntryUrl,
+  storeAdminEntryUrl,
+  customerPortalEntryUrl,
+  surveyPublicUrl,
+} from '../lib/publicAppUrls';
 
 interface AdminViewProps {
   onLogout: () => void;
@@ -153,7 +159,13 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
     <>
       <div className="flex flex-col mb-8">
         <div className="select-none">
-          <img src={`${process.env.NEXT_PUBLIC_API_PREFIX || ''}/circlx_white.svg`} alt="CIRCLX" width={150} height={50} />
+          <img
+            src="/circlx_white.svg"
+            alt="CIRCLX"
+            width={150}
+            height={50}
+            className="h-auto max-h-12 w-auto max-w-[150px] object-contain object-left"
+          />
         </div>
       </div>
 
@@ -405,7 +417,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
                         <td className="pl-5 lg:pl-6 pr-4 lg:pr-6 py-6 align-top">
                           <div className="flex flex-wrap gap-x-3 gap-y-2">
                             <a
-                              href={appendStoreQuery(appUrls.storeAdmin, acc.id)}
+                              href={storeAdminEntryUrl(appUrls.storeAdmin, acc.publicUrlTokens?.storeAdmin ?? '')}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg bg-[#fd780f]/10 px-2.5 py-1.5 text-xs font-inter font-bold text-[#fd780f] transition-colors hover:bg-[#fd780f]/15 hover:underline"
@@ -414,7 +426,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
                               店舗管理
                             </a>
                             <a
-                              href={appendStoreQuery(appUrls.kiosk, acc.id)}
+                              href={kioskEntryUrl(appUrls.kiosk, acc.publicUrlTokens?.kiosk ?? '')}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg bg-[#082752]/10 px-2.5 py-1.5 text-xs font-inter font-bold text-[#082752] transition-colors hover:bg-[#082752]/15 hover:underline"
@@ -423,7 +435,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
                               キオスク
                             </a>
                             <a
-                              href={appendStoreQuery(appUrls.customer, acc.id)}
+                              href={customerPortalEntryUrl(appUrls.customer, acc.publicUrlTokens?.portal ?? '')}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg bg-gray-100 px-2.5 py-1.5 text-xs font-inter font-bold text-gray-600 transition-colors hover:bg-gray-200 hover:underline"
@@ -432,7 +444,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
                               顧客ポータル
                             </a>
                             <a
-                              href={surveyUrlForStore(appUrls.customer, acc.id)}
+                              href={surveyPublicUrl(appUrls.customer, acc.publicUrlTokens?.survey ?? '')}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg bg-teal-50 px-2.5 py-1.5 text-xs font-inter font-bold text-teal-800 transition-colors hover:bg-teal-100 hover:underline"
@@ -478,7 +490,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
                     </div>
                     <div className="flex flex-wrap gap-2 pt-3 border-t border-gray-50">
                       <a
-                        href={appendStoreQuery(appUrls.storeAdmin, acc.id)}
+                        href={storeAdminEntryUrl(appUrls.storeAdmin, acc.publicUrlTokens?.storeAdmin ?? '')}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg bg-[#fd780f]/10 px-3 py-1.5 text-xs font-bold text-[#fd780f]"
@@ -487,7 +499,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
                         店舗管理
                       </a>
                       <a
-                        href={appendStoreQuery(appUrls.kiosk, acc.id)}
+                        href={kioskEntryUrl(appUrls.kiosk, acc.publicUrlTokens?.kiosk ?? '')}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg bg-[#082752]/10 px-3 py-1.5 text-xs font-bold text-[#082752]"
@@ -496,7 +508,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
                         キオスク
                       </a>
                       <a
-                        href={appendStoreQuery(appUrls.customer, acc.id)}
+                        href={customerPortalEntryUrl(appUrls.customer, acc.publicUrlTokens?.portal ?? '')}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-bold text-gray-600"
@@ -505,7 +517,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
                         顧客ポータル
                       </a>
                       <a
-                        href={surveyUrlForStore(appUrls.customer, acc.id)}
+                        href={surveyPublicUrl(appUrls.customer, acc.publicUrlTokens?.survey ?? '')}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg bg-teal-50 px-3 py-1.5 text-xs font-bold text-teal-800"

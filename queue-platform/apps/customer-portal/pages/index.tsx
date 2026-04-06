@@ -14,6 +14,7 @@ import {
   sortRestaurantsByDistance,
   type ExploreCategoryId,
 } from "../lib/exploreCategories";
+import { useUserLocation, computeDistance } from "../lib/geo";
 
 function toCardRestaurant(r: Restaurant) {
   return {
@@ -32,6 +33,7 @@ const Home: React.FC = () => {
   const router = useRouter();
   const storeId = router.isReady ? (router.query.storeId as string | undefined) : undefined;
 
+  const userLoc = useUserLocation();
   const [portalRestaurant, setPortalRestaurant] = useState<Restaurant | null>(null);
   const [allRestaurants, setAllRestaurants] = useState<Restaurant[]>([]);
   const [portalLoading, setPortalLoading] = useState(false);
@@ -77,8 +79,12 @@ const Home: React.FC = () => {
 
   const filteredSorted = useMemo(() => {
     const f = filterRestaurantsByExploreCategory(listToShow, categoryId);
-    return sortRestaurantsByDistance(f);
-  }, [listToShow, categoryId]);
+    const withDist = f.map((r) => ({
+      ...r,
+      distance: computeDistance(r.lat, r.lng, userLoc, r.distance),
+    }));
+    return sortRestaurantsByDistance(withDist);
+  }, [listToShow, categoryId, userLoc]);
 
   const showExploreChrome = !storeId;
 

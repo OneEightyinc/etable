@@ -1,7 +1,13 @@
 import React from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
+import { storeScopedPath } from '../lib/storePaths';
+import { useStoreAdminPublicToken } from '../lib/StoreAdminPublicTokenContext';
 
 export default function Summary() {
+  const router = useRouter();
+  const publicToken = useStoreAdminPublicToken();
+  const storeId = (router.query.storeId as string) || 'shibuya-001';
   return (
     <div className="min-h-screen bg-white text-[#22304A]">
       <div className="max-w-[420px] mx-auto px-[18px] pt-[50px] pb-[30px]">
@@ -192,7 +198,7 @@ export default function Summary() {
         {/* Action Buttons */}
         <div className="flex flex-col gap-3">
           {/* Analyze Button */}
-          <Link href="/analytics">
+          <Link href={storeScopedPath(publicToken, '/analytics', storeId)}>
             <button className="w-full h-14 rounded-full inline-flex items-center justify-center gap-3 font-extrabold text-[15px] tracking-tight shadow-[0_4px_12px_rgba(0,0,0,0.04)] border border-transparent active:translate-y-px transition-all bg-[#FD780F] text-white">
               {/* Chart Icon SVG */}
               <svg
@@ -237,7 +243,7 @@ export default function Summary() {
           </button>
 
           {/* Home Button */}
-          <Link href="/">
+          <Link href={storeScopedPath(publicToken, '/', storeId)}>
             <button className="w-full h-14 rounded-full inline-flex items-center justify-center gap-3 font-extrabold text-[15px] tracking-tight shadow-[0_4px_12px_rgba(0,0,0,0.04)] border border-[#E5E7EB] active:translate-y-px transition-all bg-transparent text-[#98A2B3]">
               {/* Home Icon SVG */}
               <svg

@@ -4,7 +4,7 @@
  * - NEXT_PUBLIC_KIOSK_URL        … キオスク（例: https://etable-blush.vercel.app）
  * - NEXT_PUBLIC_CUSTOMER_PORTAL_URL … 顧客ポータル（例: https://etable-customer-portal.vercel.app）
  *
- * 未設定かつ localhost のときだけ :3005 / :3007 / :3006 にフォールバック（ローカル開発用）。
+ * 未設定かつ localhost のときだけ :3020 / :3022 / :3006 にフォールバック（store-admin dev 3020、kiosk dev 3022）。
  */
 
 function trimBase(u: string | undefined): string {
@@ -43,9 +43,9 @@ export function withLocalPortFallback(urls: AppBaseUrls): AppBaseUrls {
   const { protocol, hostname } = window.location;
   if (!isLocalHostname(hostname)) return urls;
   return {
-    storeAdmin: urls.storeAdmin || `${protocol}//${hostname}:3005`,
-    kiosk: urls.kiosk || `${protocol}//${hostname}:3007`,
-    customer: urls.customer || `${protocol}//${hostname}:3006`,
+    storeAdmin: urls.storeAdmin || `${protocol}//${hostname}:3020`,
+    kiosk: urls.kiosk || `${protocol}//${hostname}:3022`,
+    customer: urls.customer || `${protocol}//${hostname}:3021`,
     fullyConfigured: true
   };
 }
@@ -56,9 +56,30 @@ export function appendStoreQuery(base: string, storeId: string): string {
   return base.includes("?") ? `${base}&${q}` : `${base}?${q}`;
 }
 
-/** 顧客ポータル上の来店アンケート（/survey/[storeId]） */
-export function surveyUrlForStore(customerPortalBase: string, storeId: string): string {
+/** 店舗管理（不透明トークン /a/:token） */
+export function storeAdminEntryUrl(base: string, publicToken: string): string {
+  const b = trimBase(base);
+  if (!b || !publicToken || publicToken.length < 32) return "#";
+  return `${b}/a/${publicToken}`;
+}
+
+/** キオスク（/k/:token） */
+export function kioskEntryUrl(base: string, publicToken: string): string {
+  const b = trimBase(base);
+  if (!b || !publicToken || publicToken.length < 32) return "#";
+  return `${b}/k/${publicToken}`;
+}
+
+/** 顧客ポータル店舗入口（/p/:token） */
+export function customerPortalEntryUrl(base: string, publicToken: string): string {
+  const b = trimBase(base);
+  if (!b || !publicToken || publicToken.length < 32) return "#";
+  return `${b}/p/${publicToken}`;
+}
+
+/** 来店アンケート（/q/:token） */
+export function surveyPublicUrl(customerPortalBase: string, surveyToken: string): string {
   const base = trimBase(customerPortalBase);
-  if (!base) return "#";
-  return `${base}/survey/${encodeURIComponent(storeId)}`;
+  if (!base || !surveyToken || surveyToken.length < 32) return "#";
+  return `${base}/q/${surveyToken}`;
 }

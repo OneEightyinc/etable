@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { requireAuth, getAccountById, updateAccount, deleteAccount } from '@queue-platform/api/src/server';
+import { serializeAccountForMasterAdminApi } from '../../../lib/serializeAccountForApi';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = requireAuth(req, res, ['SUPER_ADMIN']);
@@ -12,14 +13,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const account = await getAccountById(id);
     if (!account) return res.status(404).json({ error: 'アカウントが見つかりません' });
     return res.status(200).json({
-      account: {
-        id: account.id,
-        name: account.name,
-        email: account.email,
-        storeName: account.storeName,
-        status: account.status,
-        createdAt: account.createdAt,
-      },
+      account: serializeAccountForMasterAdminApi(account),
     });
   }
 
@@ -27,14 +21,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     try {
       const account = await updateAccount(id, req.body);
       return res.status(200).json({
-        account: {
-          id: account.id,
-          name: account.name,
-          email: account.email,
-          storeName: account.storeName,
-          status: account.status,
-          createdAt: account.createdAt,
-        },
+        account: serializeAccountForMasterAdminApi(account),
       });
     } catch (err: any) {
       return res.status(404).json({ error: err.message });

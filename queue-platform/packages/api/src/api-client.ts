@@ -61,6 +61,14 @@ export async function getMe(): Promise<LoginResponse['user'] | null> {
 }
 
 // ─── Accounts ────────────────────────────────────────────
+/** 店舗ごとの公開用不透明トークン（マスター管理でリンク表示用） */
+export interface AccountPublicUrlTokens {
+  storeAdmin?: string;
+  kiosk?: string;
+  portal?: string;
+  survey?: string;
+}
+
 export interface AccountData {
   id: string;
   name: string;
@@ -68,6 +76,7 @@ export interface AccountData {
   storeName: string;
   status: 'ACTIVE' | 'DISABLED';
   createdAt: string;
+  publicUrlTokens?: AccountPublicUrlTokens;
 }
 
 export async function getAccounts(): Promise<AccountData[]> {
@@ -183,6 +192,8 @@ export interface StoreSettingsData {
   portalDescription?: string;
   portalAddress?: string;
   portalDistanceLabel?: string;
+  portalLat?: number | null;
+  portalLng?: number | null;
   portalRating?: number;
   portalPriceRange?: string;
   portalHoursSummary?: string;

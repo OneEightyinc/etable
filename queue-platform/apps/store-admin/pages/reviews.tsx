@@ -1,4 +1,7 @@
 import Link from 'next/link';
+import { useRouter } from 'next/router';
+import { storeScopedPath } from '../lib/storePaths';
+import { useStoreAdminPublicToken } from '../lib/StoreAdminPublicTokenContext';
 
 interface Review {
   rating: number;
@@ -63,11 +66,15 @@ const StarRating = ({ rating, size = 'md' }: { rating: number; size?: 'sm' | 'md
 };
 
 export default function ReviewsPage() {
+  const router = useRouter();
+  const publicToken = useStoreAdminPublicToken();
+  const storeId = (router.query.storeId as string) || 'shibuya-001';
+
   return (
     <div className="min-h-screen bg-[#F9FAFB]">
       {/* Header */}
       <div className="sticky top-0 bg-white border-b border-gray-100 px-4 py-4 flex items-center z-10">
-        <Link href="/" className="w-8 h-8 flex items-center justify-center text-[#082752] hover:bg-gray-100 rounded-lg transition-colors">
+        <Link href={storeScopedPath(publicToken, '/', storeId)} className="w-8 h-8 flex items-center justify-center text-[#082752] hover:bg-gray-100 rounded-lg transition-colors">
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path d="M15 18l-6-6 6-6" strokeWidth={2} />
           </svg>

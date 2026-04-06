@@ -1,19 +1,13 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { requireAuth, getAllAccounts, createAccount } from '@queue-platform/api/src/server';
+import { serializeAccountForMasterAdminApi } from '../../../lib/serializeAccountForApi';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = requireAuth(req, res, ['SUPER_ADMIN']);
   if (!session) return;
 
   if (req.method === 'GET') {
-    const accounts = (await getAllAccounts()).map((a) => ({
-      id: a.id,
-      name: a.name,
-      email: a.email,
-      storeName: a.storeName,
-      status: a.status,
-      createdAt: a.createdAt,
-    }));
+    const accounts = (await getAllAccounts()).map(serializeAccountForMasterAdminApi);
     return res.status(200).json({ accounts });
   }
 
@@ -32,14 +26,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         status: status || 'ACTIVE',
       });
       return res.status(201).json({
-        account: {
-          id: account.id,
-          name: account.name,
-          email: account.email,
-          storeName: account.storeName,
-          status: account.status,
-          createdAt: account.createdAt,
-        },
+        account: serializeAccountForMasterAdminApi(account),
       });
     } catch (err: any) {
       return res.status(409).json({ error: err.message });

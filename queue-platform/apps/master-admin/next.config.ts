@@ -6,10 +6,12 @@ const monorepoRoot = path.join(__dirname, "..", "..");
 const nextConfig: NextConfig = {
   assetPrefix: process.env.VERCEL ? "https://master-admin-xi.vercel.app" : undefined,
   env: {
-    NEXT_PUBLIC_API_PREFIX: "/admin",
-    NEXT_PUBLIC_STORE_ADMIN_URL: "https://etable.net/store",
-    NEXT_PUBLIC_KIOSK_URL: "https://etable.net/kiosk",
-    NEXT_PUBLIC_CUSTOMER_PORTAL_URL: "https://etable.net",
+    // ローカルは空（/api/...）。本番でリバースプロキシのサブパス配下に置く場合のみ Vercel 等で NEXT_PUBLIC_API_PREFIX=/admin を設定
+    NEXT_PUBLIC_API_PREFIX: process.env.NEXT_PUBLIC_API_PREFIX ?? "",
+    // 未設定時はブラウザが localhost のとき hooks が :3020 / :3007 / :3006 にフォールバック（本番は Vercel で各 URL を設定）
+    NEXT_PUBLIC_STORE_ADMIN_URL: process.env.NEXT_PUBLIC_STORE_ADMIN_URL ?? "",
+    NEXT_PUBLIC_KIOSK_URL: process.env.NEXT_PUBLIC_KIOSK_URL ?? "",
+    NEXT_PUBLIC_CUSTOMER_PORTAL_URL: process.env.NEXT_PUBLIC_CUSTOMER_PORTAL_URL ?? "",
   },
   transpilePackages: ["@queue-platform/api"],
   // Vercel / monorepo: trace shared package from queue-platform root

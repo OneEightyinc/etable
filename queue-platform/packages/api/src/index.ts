@@ -29,6 +29,7 @@ export {
 export type {
   LoginResponse,
   AccountData,
+  AccountPublicUrlTokens,
   QueueEntryData,
   StoreSettingsData,
 } from './api-client';

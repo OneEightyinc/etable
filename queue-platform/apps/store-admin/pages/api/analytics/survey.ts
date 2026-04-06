@@ -1,18 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import {
-  getSurveyResponses,
-  getSessionFromRequest,
-  isStoreIdRecognized,
-} from "@queue-platform/api/src/server";
+import { getSurveyResponses, isStoreIdRecognized } from "@queue-platform/api/src/server";
 import type { SurveyResponse } from "@queue-platform/api/src/server";
+import { requireStoreAdminForStore } from "../../../lib/requireStoreAdminForStore";
 
-/**
- * 来店者アンケート集計（GET）
- *
- * store-admin の画面ログインは sessionStorage のみで HttpOnly クッキーが付かないため、
- * requireAuth だけだと常に 401 になる。queue/history と同様に storeId で取得する。
- * circlx_session がある店舗管理者は、自分の店舗以外の storeId を指定できない。
- */
+/** 来店者アンケート集計（GET）— 店舗管理者セッションと storeId が一致すること */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "GET") {
     return res.status(405).json({ error: "許可されていないメソッドです" });
@@ -23,10 +14,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ error: "店舗IDが必要です" });
   }
 
-  const session = getSessionFromRequest(req);
-  if (session?.role === "STORE_ADMIN" && session.storeId && session.storeId !== storeIdParam) {
-    return res.status(403).json({ error: "権限がありません" });
-  }
+  if (!requireStoreAdminForStore(req, res, storeIdParam)) return;
 
   if (!(await isStoreIdRecognized(storeIdParam))) {
     return res.status(404).json({ error: "店舗が見つかりません" });

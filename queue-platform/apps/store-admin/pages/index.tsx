@@ -1,30 +1,62 @@
 import type { NextPage } from "next";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/router";
 import StoreView from "../components/StoreView";
 import StoreLoginScreen from "../components/StoreLoginScreen";
 import ReceptionStartScreen from "../components/ReceptionStartScreen";
-import {
-  isStoreAdminLoggedIn,
-  isStoreReceptionStarted,
-  markStoreAdminLoggedIn,
-  markStoreReceptionStarted,
-  clearStoreAdminSession,
-} from "../lib/storeAdminSession";
+import { isStoreReceptionStarted, markStoreReceptionStarted, clearStoreAdminSession } from "../lib/storeAdminSession";
 
 type Phase = "hydrate" | "login" | "closed" | "app";
 
 const StoreAdminPage: NextPage = () => {
+  const router = useRouter();
   const [phase, setPhase] = useState<Phase>("hydrate");
+  const [bannerError, setBannerError] = useState("");
+
+  const runAuthGate = useCallback(async () => {
+    try {
+      const r = await fetch("/api/auth/me", { credentials: "include" });
+      if (r.status === 401) {
+        setPhase("login");
+        return;
+      }
+      if (!r.ok) {
+        setPhase("login");
+        return;
+      }
+      const data = (await r.json()) as {
+        user?: { role?: string; storeId?: string };
+      };
+      const u = data.user;
+      if (!u || u.role !== "STORE_ADMIN" || !u.storeId) {
+        setPhase("login");
+        return;
+      }
+
+      const raw = router.query.storeId;
+      const urlStore = typeof raw === "string" && raw.trim() ? raw.trim() : "";
+      if (urlStore && urlStore !== u.storeId) {
+        await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+        setBannerError("このURLの店舗とログインできるアカウントが一致しません。発行された店舗用URLからログインしてください。");
+        setPhase("login");
+        return;
+      }
+
+      setBannerError("");
+      if (!isStoreReceptionStarted()) setPhase("closed");
+      else setPhase("app");
+    } catch {
+      setPhase("login");
+    }
+  }, [router.query.storeId]);
 
   useEffect(() => {
-    if (!isStoreAdminLoggedIn()) setPhase("login");
-    else if (!isStoreReceptionStarted()) setPhase("closed");
-    else setPhase("app");
-  }, []);
+    if (!router.isReady) return;
+    void runAuthGate();
+  }, [router.isReady, runAuthGate]);
 
-  const handleLogin = () => {
-    markStoreAdminLoggedIn();
-    setPhase("closed");
+  const handleLoginSuccess = () => {
+    void runAuthGate();
   };
 
   const handleReceptionStart = () => {
@@ -32,7 +64,12 @@ const StoreAdminPage: NextPage = () => {
     setPhase("app");
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+    } catch {
+      /* ignore */
+    }
     clearStoreAdminSession();
     setPhase("login");
   };
@@ -46,7 +83,15 @@ const StoreAdminPage: NextPage = () => {
   }
 
   if (phase === "login") {
-    return <StoreLoginScreen onLogin={handleLogin} />;
+    const raw = router.query.storeId;
+    const storeIdHint = typeof raw === "string" && raw.trim() ? raw.trim() : "";
+    return (
+      <StoreLoginScreen
+        onLoginSuccess={handleLoginSuccess}
+        storeIdHint={storeIdHint}
+        bannerError={bannerError}
+      />
+    );
   }
 
   if (phase === "closed") {

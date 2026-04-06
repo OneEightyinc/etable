@@ -5,7 +5,10 @@ import { translations } from "../lib/i18n";
 type Step = "phone" | "people" | "seat" | "complete";
 type Seat = "TABLE" | "COUNTER" | "EITHER";
 
-const STORE_ID = "shibuya-001"; // TODO: make configurable
+export type KioskPageProps = {
+  /** マスタ登録の店舗ID（/s/:id または ?storeId=） */
+  storeId: string;
+};
 
 const MAX_PHONE = 11;
 const keypad = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "←"];
@@ -61,7 +64,7 @@ function StepIndicatorSeat() {
   );
 }
 
-export default function KioskPage() {
+export default function KioskPage({ storeId }: KioskPageProps) {
   const [step, setStep] = useState<Step>("phone");
   const [lang, setLang] = useState<Lang>("ja");
   const [phone, setPhone] = useState("");
@@ -81,7 +84,7 @@ export default function KioskPage() {
   useEffect(() => {
     if (step === "complete") return;
     const ac = new AbortController();
-    fetch(`/api/queue?storeId=${STORE_ID}`, { signal: ac.signal })
+    fetch(`/api/queue?storeId=${encodeURIComponent(storeId)}`, { signal: ac.signal })
       .then((r) => r.json())
       .then((data) => {
         if (data.stats) {
@@ -92,7 +95,7 @@ export default function KioskPage() {
       })
       .catch(() => {});
     return () => ac.abort();
-  }, [step]);
+  }, [step, storeId]);
 
   useEffect(() => {
     if (step !== "complete") return;
@@ -383,7 +386,7 @@ export default function KioskPage() {
                     const res = await fetch("/api/queue", {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ storeId: STORE_ID, adults: people, children: 0, seatType: seat, phone }),
+                      body: JSON.stringify({ storeId, adults: people, children: 0, seatType: seat, phone }),
                     });
                     let data: { entry?: { ticketNumber: number }; stats?: { waitingCount: number; estimatedWait: number; currentTicket: number | null }; error?: string } = {};
                     try {

@@ -31,7 +31,7 @@ const RestaurantDetail: React.FC = () => {
         <AppHeader />
         <main className="flex-grow pt-16 pb-24">
           <div className="mx-auto flex h-96 w-full max-w-[393px] items-center justify-center">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#FD780F] border-t-transparent" />
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#ff6b00] border-t-transparent" />
           </div>
         </main>
         <BottomNavigation />
@@ -83,7 +83,7 @@ const RestaurantDetail: React.FC = () => {
   );
 
   const HeartIcon = ({ filled }: { filled: boolean }) => (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill={filled ? "#FD780F" : "white"} stroke={filled ? "#FD780F" : "white"} strokeWidth="2" xmlns="http://www.w3.org/2000/svg">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill={filled ? "#ff6b00" : "white"} stroke={filled ? "#ff6b00" : "white"} strokeWidth="2" xmlns="http://www.w3.org/2000/svg">
       <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
     </svg>
   );
@@ -102,14 +102,14 @@ const RestaurantDetail: React.FC = () => {
   );
 
   const ClockIcon = () => (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FD780F" strokeWidth="2" xmlns="http://www.w3.org/2000/svg">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff6b00" strokeWidth="2" xmlns="http://www.w3.org/2000/svg">
       <circle cx="12" cy="12" r="10" />
       <polyline points="12 6 12 12 16 14" />
     </svg>
   );
 
   const ExternalLinkIcon = () => (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FD780F" strokeWidth="2" xmlns="http://www.w3.org/2000/svg">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ff6b00" strokeWidth="2" xmlns="http://www.w3.org/2000/svg">
       <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
       <polyline points="15 3 21 3 21 9" />
       <line x1="10" y1="14" x2="21" y2="3" />
@@ -160,7 +160,7 @@ const RestaurantDetail: React.FC = () => {
                 onClick={() => setActiveTab(tab)}
                 className={`flex-1 py-4 text-center text-[14px] font-medium transition-colors ${
                   activeTab === tab
-                    ? "text-[#FD780F] border-b-2 border-[#FD780F]"
+                    ? "text-[#ff6b00] border-b-2 border-[#ff6b00]"
                     : "text-[#999]"
                 }`}
               >
@@ -212,9 +212,9 @@ const RestaurantDetail: React.FC = () => {
                   <h3 className="text-[13px] font-bold text-[#222] mb-3">混雑状況</h3>
                   <div className="space-y-2">
                     <p className="text-[14px] text-[#222]">
-                      <span className="font-bold text-[#FD780F]">{restaurant.waitingGroups}組</span>が順番待ち中
+                      <span className="font-bold text-[#ff6b00]">{restaurant.waitingGroups}組</span>が順番待ち中
                     </p>
-                    <p className="text-[14px] font-bold text-[#FD780F]">
+                    <p className="text-[14px] font-bold text-[#ff6b00]">
                       {restaurant.approxWaitText}
                     </p>
                   </div>
@@ -275,7 +275,7 @@ const RestaurantDetail: React.FC = () => {
                       href={`https://www.google.com/maps/search/${encodeURIComponent(restaurant.address)}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-2 text-[#FD780F] text-[13px] font-medium hover:underline mt-2"
+                      className="flex items-center gap-2 text-[#ff6b00] text-[13px] font-medium hover:underline mt-2"
                     >
                       <MapPinIcon />
                       Google Mapsで確認
@@ -323,7 +323,7 @@ const RestaurantDetail: React.FC = () => {
       {/* Reservation Button */}
       <div className="fixed bottom-20 left-0 right-0 px-4 py-4 bg-white border-t border-gray-200">
         <div className="mx-auto w-full max-w-[393px]">
-          <Link href={`/restaurant/${restaurant.id}/reserve`} className="block w-full bg-[#FD780F] hover:bg-[#ff6b00] text-white font-bold py-3 px-4 rounded-lg transition-colors text-center">
+          <Link href={`/restaurant/${restaurant.id}/reserve`} className="block w-full bg-[#ff6b00] hover:opacity-95 text-white font-bold py-3 px-4 rounded-lg transition-colors text-center">
             並ばずに順番待ち
           </Link>
         </div>

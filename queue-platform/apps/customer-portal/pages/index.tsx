@@ -1,30 +1,42 @@
-import React, { useState, useEffect } from "react";
-import Link from "next/link";
+import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/router";
 import AppHeader from "../components/common/AppHeader";
 import BottomNavigation from "../components/common/BottomNavigation";
+import SectionHeader from "../components/common/SectionHeader";
 import RestaurantCard from "../components/home/RestaurantCard";
-import { getFavorites, addFavorite, removeFavorite } from "../lib/storage";
+import SearchToggleTabs from "../components/home/SearchToggleTabs";
+import CategoryFilter from "../components/home/CategoryFilter";
 import { portalProfileToRestaurant } from "../lib/portalRestaurant";
 import type { Restaurant } from "../data/restaurants";
 import type { StorePortalProfile } from "@queue-platform/api/src/server";
+import {
+  filterRestaurantsByExploreCategory,
+  sortRestaurantsByDistance,
+  type ExploreCategoryId,
+} from "../lib/exploreCategories";
+
+function toCardRestaurant(r: Restaurant) {
+  return {
+    id: r.id,
+    name: r.name,
+    category: r.category,
+    imageUrl: r.imageUrl,
+    rating: r.rating,
+    distance: r.distance,
+    waitingGroups: r.waitingGroups,
+    estimatedWaitMinutes: Math.max(1, r.shortestWaitMinutes || 1),
+  };
+}
 
 const Home: React.FC = () => {
   const router = useRouter();
   const storeId = router.isReady ? (router.query.storeId as string | undefined) : undefined;
 
-  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
-  const [isClient, setIsClient] = useState(false);
   const [portalRestaurant, setPortalRestaurant] = useState<Restaurant | null>(null);
   const [allRestaurants, setAllRestaurants] = useState<Restaurant[]>([]);
   const [portalLoading, setPortalLoading] = useState(false);
   const [portalError, setPortalError] = useState("");
-
-  useEffect(() => {
-    setIsClient(true);
-    const favorites = getFavorites();
-    setFavoriteIds(new Set(favorites.map((f) => f.restaurantId)));
-  }, []);
+  const [categoryId, setCategoryId] = useState<ExploreCategoryId>("all");
 
   useEffect(() => {
     if (!router.isReady) return;
@@ -32,7 +44,6 @@ const Home: React.FC = () => {
     setPortalError("");
 
     if (storeId) {
-      // 特定の店舗を表示
       fetch(`/api/store/public?storeId=${encodeURIComponent(storeId)}`)
         .then(async (res) => {
           if (!res.ok) throw new Error("not found");
@@ -46,7 +57,6 @@ const Home: React.FC = () => {
         })
         .finally(() => setPortalLoading(false));
     } else {
-      // 全 Active 店舗を一覧表示
       fetch("/api/store/public")
         .then(async (res) => {
           if (!res.ok) throw new Error("failed");
@@ -62,72 +72,57 @@ const Home: React.FC = () => {
     }
   }, [router.isReady, storeId]);
 
-  const handleFavoriteToggle = (id: string) => {
-    if (favoriteIds.has(id)) {
-      removeFavorite(id);
-      const next = new Set(favoriteIds);
-      next.delete(id);
-      setFavoriteIds(next);
-      return;
-    }
-    const target = portalRestaurant?.id === id
-      ? portalRestaurant
-      : allRestaurants.find((r) => r.id === id);
-    if (target) {
-      addFavorite({
-        id: `fav_${id}`,
-        restaurantId: id,
-        restaurantName: target.name,
-      });
-      const next = new Set(favoriteIds);
-      next.add(id);
-      setFavoriteIds(next);
-    }
-  };
-
   const listToShow: Restaurant[] =
     storeId && portalRestaurant ? [portalRestaurant] : allRestaurants;
+
+  const filteredSorted = useMemo(() => {
+    const f = filterRestaurantsByExploreCategory(listToShow, categoryId);
+    return sortRestaurantsByDistance(f);
+  }, [listToShow, categoryId]);
+
+  const showExploreChrome = !storeId;
 
   return (
     <>
       <AppHeader />
-      <main className="flex-grow pt-16 pb-24">
+      <main className="min-h-screen flex-grow bg-white pb-24 pt-16">
         <div className="mx-auto w-full max-w-[393px] bg-white">
-          <div className="px-4 py-2">
-            <h2 className="mb-4 text-[14px] font-bold text-[#222]">
-              {storeId ? "店舗情報" : "店舗一覧"}
-            </h2>
+          {showExploreChrome ? (
+            <>
+              <CategoryFilter value={categoryId} onChange={setCategoryId} />
+              <SearchToggleTabs />
+              <SectionHeader title="近くの店舗" highlight={`${filteredSorted.length}件`} sortOption="距離順" />
+            </>
+          ) : (
+            <div className="px-[23.991px] pt-[11.99px] pb-[15.99px]">
+              <h2 className="text-[18px] font-bold leading-[28px] text-[#0a0a0a]">店舗情報</h2>
+            </div>
+          )}
+
+          <div className="pb-[96px]">
             {portalLoading && (
               <div className="flex justify-center py-16">
-                <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#FD780F] border-t-transparent" />
+                <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#ff6b00] border-t-transparent" />
               </div>
             )}
             {portalError && !portalLoading && (
-              <p className="py-8 text-center text-sm text-red-500">{portalError}</p>
+              <p className="px-6 py-8 text-center text-sm text-red-500">{portalError}</p>
             )}
-            {!portalLoading && !portalError && listToShow.length === 0 && (
-              <p className="py-8 text-center text-sm text-[#666]">現在表示できる店舗がありません</p>
+            {!portalLoading && !portalError && filteredSorted.length === 0 && (
+              <p className="px-6 py-8 text-center text-sm text-[#666]">
+                {showExploreChrome
+                  ? "この条件に合う店舗がありません。カテゴリを変えてお試しください。"
+                  : "現在表示できる店舗がありません"}
+              </p>
             )}
-            <div className="space-y-3">
-              {listToShow.map((restaurant) => (
+            {!portalLoading &&
+              !portalError &&
+              filteredSorted.map((restaurant) => (
                 <RestaurantCard
                   key={restaurant.id}
-                  restaurant={{
-                    id: restaurant.id,
-                    name: restaurant.name,
-                    category: restaurant.category,
-                    imageUrl: restaurant.imageUrl,
-                    rating: restaurant.rating,
-                    distance: restaurant.distance,
-                    waitingGroups: restaurant.waitingGroups,
-                    shortestWaitMinutes: restaurant.shortestWaitMinutes,
-                    approxWaitText: restaurant.approxWaitText,
-                  }}
-                  isFavorited={isClient && favoriteIds.has(restaurant.id)}
-                  onFavoriteToggle={handleFavoriteToggle}
+                  restaurant={toCardRestaurant(restaurant)}
                 />
               ))}
-            </div>
           </div>
         </div>
       </main>

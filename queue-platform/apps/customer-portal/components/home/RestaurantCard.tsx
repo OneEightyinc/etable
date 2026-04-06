@@ -1,130 +1,91 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
+import Image from "next/image";
 import Link from "next/link";
+import { ClockIcon } from "@heroicons/react/24/outline";
+import WaitingBadge from "../common/WaitingBadge";
+import FavoriteButton from "../common/FavoriteButton";
+import DistanceMeta from "../common/DistanceMeta";
 
-interface RestaurantCardProps {
-  restaurant: {
-    id: string;
-    name: string;
-    category: string;
-    imageUrl: string;
-    rating: number;
-    distance: string;
-    waitingGroups: number;
-    shortestWaitMinutes: number;
-    approxWaitText: string;
-  };
-  isFavorited: boolean;
-  onFavoriteToggle: (id: string) => void;
+export interface RestaurantCardRestaurant {
+  id: string;
+  name: string;
+  category: string;
+  imageUrl: string;
+  rating: number;
+  distance: string;
+  waitingGroups: number;
+  estimatedWaitMinutes: number;
 }
 
-const RestaurantCard: React.FC<RestaurantCardProps> = ({
-  restaurant,
-  isFavorited,
-  onFavoriteToggle,
-}) => {
-  const [isClient, setIsClient] = useState(false);
+interface RestaurantCardProps {
+  restaurant: RestaurantCardRestaurant;
+  onAfterToggle?: () => void;
+}
 
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
-
-  const handleFavoriteClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    onFavoriteToggle(restaurant.id);
-  };
-
-  const StarIcon = () => (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="#FFB800" xmlns="http://www.w3.org/2000/svg">
-      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-    </svg>
-  );
-
-  const HeartIcon = ({ filled }: { filled: boolean }) => (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill={filled ? "#FD780F" : "white"} stroke={filled ? "#FD780F" : "#999"} strokeWidth="2" xmlns="http://www.w3.org/2000/svg">
-      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-    </svg>
-  );
-
-  const ClockIcon = () => (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth="2" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="12" cy="12" r="10" />
-      <polyline points="12 6 12 12 16 14" />
-    </svg>
-  );
-
-  const MapPinIcon = () => (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth="2" xmlns="http://www.w3.org/2000/svg">
-      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-      <circle cx="12" cy="10" r="3" />
-    </svg>
-  );
+/** デザインモック（etable-online）と同一レイアウト・タイポ・配色 */
+const RestaurantCard: React.FC<RestaurantCardProps> = ({ restaurant, onAfterToggle }) => {
+  const isImmediate = restaurant.waitingGroups <= 1;
 
   return (
-    <Link href={`/restaurant/${restaurant.id}`}>
-      <div className="flex gap-3 p-4 bg-white border border-gray-200 rounded-lg hover:shadow-md transition-shadow cursor-pointer relative">
-        {/* Image Container */}
-        <div className="relative w-24 h-[120px] flex-shrink-0">
-          <img
-            src={restaurant.imageUrl}
-            alt={restaurant.name}
-            width={96}
-            height={120}
-            className="w-24 h-[120px] object-cover rounded"
-          />
-          {/* Waiting Groups Badge */}
-          {restaurant.waitingGroups > 0 && (
-            <div className="absolute top-2 right-2 bg-[#FD780F] text-white text-[10px] font-bold px-2 py-1 rounded">
-              {restaurant.waitingGroups}組
+    <Link
+      href={`/restaurant/${restaurant.id}`}
+      className="relative mb-[15.99px] mx-[23.991px] block"
+    >
+      <div className="overflow-hidden rounded-[24px] border border-[#e5e5e5] border-[0.676px] bg-white shadow-[0px_1px_3px_0px_rgba(0,0,0,0.1),0px_1px_2px_-1px_rgba(0,0,0,0.1)]">
+        <div className="relative h-[144.97px]">
+          <div className="absolute left-[15.99px] top-[15.99px] size-[95.995px]">
+            <div className="relative size-full">
+              <Image
+                src={restaurant.imageUrl}
+                alt={restaurant.name}
+                width={96}
+                height={120}
+                className="h-[120px] w-[96px] rounded-xl object-cover"
+                unoptimized
+              />
+              <WaitingBadge waitingGroups={restaurant.waitingGroups} className="absolute right-[-8px] top-[-8px]" />
             </div>
-          )}
-        </div>
+          </div>
 
-        {/* Info Container */}
-        <div className="flex-1 flex flex-col justify-between">
-          <div>
-            <p className="text-[11px] text-[#999] mb-1">{restaurant.category}</p>
-            <h3 className="text-[14px] font-bold text-[#222] line-clamp-2 mb-2">
+          <div className="absolute left-[127.98px] top-[15.99px] w-[200.177px]">
+            <div className="inline-flex h-[18.191px] items-center rounded-[4px] bg-[#f5f5f5] px-[7.997px]">
+              <span className="text-[10px] font-bold uppercase leading-[15px] tracking-[0.5px] text-[#999]">
+                {restaurant.category}
+              </span>
+            </div>
+
+            <h3 className="mt-[4px] overflow-hidden text-ellipsis whitespace-nowrap text-[14px] font-bold leading-[20px] text-[#0a0a0a]">
               {restaurant.name}
             </h3>
 
-            {/* Rating and Distance */}
-            <div className="flex items-center gap-2 mb-2">
-              <div className="flex items-center gap-1">
-                <StarIcon />
-                <span className="text-[12px] font-bold text-[#222]">
-                  {restaurant.rating.toFixed(1)}
+            <div className="mt-[3.99px]">
+              <DistanceMeta rating={restaurant.rating} distance={restaurant.distance} />
+            </div>
+
+            <div className="mt-[7.99px] flex flex-col gap-[3.993px]">
+              <div className="flex items-center gap-[3.993px]">
+                <ClockIcon className="size-[11.99px] text-[#ff6b00]" />
+                <span className="border-b border-[#ff6b00] border-b-[0.676px] pb-[2.676px]">
+                  <span className="text-[11px] font-black leading-[16.5px] text-[#ff6b00]">
+                    最短{restaurant.estimatedWaitMinutes}分
+                  </span>
                 </span>
               </div>
-              <div className="flex items-center gap-1">
-                <MapPinIcon />
-                <span className="text-[12px] text-[#999]">
-                  {restaurant.distance}
-                </span>
-              </div>
+              {isImmediate ? (
+                <p className="text-[9px] font-bold leading-[13.5px] tracking-[-0.45px] text-[#ff6b00] opacity-70">
+                  到着後すぐにご案内可能です
+                </p>
+              ) : null}
             </div>
           </div>
-
-          {/* Wait Time */}
-          <div className="flex items-center gap-1">
-            <ClockIcon />
-            <span className="text-[12px] text-[#FD780F] font-medium">
-              {restaurant.approxWaitText}
-            </span>
-          </div>
         </div>
-
-        {/* Favorite Button */}
-        {isClient && (
-          <button
-            onClick={handleFavoriteClick}
-            className="absolute top-3 right-3 bg-white rounded-full p-1 shadow-sm hover:shadow-md transition-shadow"
-            aria-label={isFavorited ? "Remove from favorites" : "Add to favorites"}
-          >
-            <HeartIcon filled={isFavorited} />
-          </button>
-        )}
       </div>
+
+      <FavoriteButton
+        restaurantId={restaurant.id}
+        restaurantName={restaurant.name}
+        onAfterToggle={onAfterToggle}
+      />
     </Link>
   );
 };

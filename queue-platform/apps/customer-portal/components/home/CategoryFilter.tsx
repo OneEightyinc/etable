@@ -1,63 +1,56 @@
-import React, { useRef } from "react";
+import React from "react";
+import Image from "next/image";
+import { EXPLORE_CATEGORIES, type ExploreCategoryId } from "../../lib/exploreCategories";
 
 interface CategoryFilterProps {
-  value: string;
-  onChange: (category: string) => void;
+  value: ExploreCategoryId;
+  onChange: (id: ExploreCategoryId) => void;
 }
 
+/** デザインモック同様: 横スクロール・アイコンタイル・選択時オレンジ背景＋白アイコン */
 const CategoryFilter: React.FC<CategoryFilterProps> = ({ value, onChange }) => {
-  const categories = [
-    "すべて",
-    "和食",
-    "寿司",
-    "焼肉",
-    "ラーメン",
-    "カフェ",
-    "イタリアン",
-    "中華",
-    "居酒屋",
-    "スイーツ",
-  ];
-
-  const scrollRef = useRef<HTMLDivElement>(null);
-
   return (
-    <div className="w-full px-4 py-4">
-      <div
-        ref={scrollRef}
-        className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide"
-        style={{ scrollBehavior: "smooth" }}
-      >
-        {categories.map((category) => {
-          const isActive = value === category;
-          return (
-            <button
-              key={category}
-              onClick={() => onChange(category)}
-              className="flex flex-col items-center gap-2 flex-shrink-0"
+    <div
+      className="scrollbar-hide flex gap-[15.994px] overflow-x-auto px-[23.991px] pb-[11.99px] pt-[9.99px] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      aria-label="カテゴリー"
+    >
+      {EXPLORE_CATEGORIES.map((c) => {
+        const isSelected = c.id === value;
+        return (
+          <button
+            key={c.id}
+            type="button"
+            className={[
+              "flex h-[79.991px] w-[63.997px] shrink-0 flex-col items-center gap-[7.997px]",
+              !isSelected ? "opacity-60" : "",
+            ].join(" ")}
+            onClick={() => onChange(c.id)}
+          >
+            <div
+              className={[
+                "grid size-[56px] shrink-0 place-items-center rounded-[20px]",
+                isSelected ? "bg-[#ff6b00]" : "bg-[#f5f5f5]",
+              ].join(" ")}
             >
-              <div
-                className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors ${
-                  isActive ? "bg-[#FD780F]" : "bg-[#f5f5f5]"
-                }`}
-              >
-                <span className={`text-[12px] font-medium ${isActive ? "text-white" : "text-[#666]"}`}>
-                  {category}
-                </span>
-              </div>
-            </button>
-          );
-        })}
-      </div>
-      <style jsx>{`
-        .scrollbar-hide::-webkit-scrollbar {
-          display: none;
-        }
-        .scrollbar-hide {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-      `}</style>
+              <Image
+                src={c.icon}
+                alt={c.label}
+                width={24}
+                height={24}
+                className={isSelected ? "brightness-0 invert" : ""}
+              />
+            </div>
+            <span
+              className={[
+                "text-center text-[12px] font-medium leading-[16px]",
+                isSelected ? "text-[#ff6b00]" : "text-[#999]",
+              ].join(" ")}
+            >
+              {c.label}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 };

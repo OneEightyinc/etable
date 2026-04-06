@@ -450,11 +450,16 @@ function bumpTicketNumber(db: Database, storeId: string): number {
 }
 
 // ─── Queue Management ────────────────────────────────────
+function getActiveQueueForStore(db: Database, storeId: string): QueueEntry[] {
+  const q = db.queue ?? [];
+  return q
+    .filter((e) => e.storeId === storeId && !["DONE", "CANCELLED"].includes(e.status))
+    .sort((a, b) => new Date(a.arrivalTime).getTime() - new Date(b.arrivalTime).getTime());
+}
+
 export async function getQueueByStore(storeId: string): Promise<QueueEntry[]> {
   const db = await readDatabase();
-  return db.queue
-    .filter((q) => q.storeId === storeId && !["DONE", "CANCELLED"].includes(q.status))
-    .sort((a, b) => new Date(a.arrivalTime).getTime() - new Date(b.arrivalTime).getTime());
+  return getActiveQueueForStore(db, storeId);
 }
 
 export async function getNextTicketNumber(storeId: string): Promise<number> {
@@ -536,12 +541,11 @@ export async function getQueuePosition(
   };
 }
 
-export async function getQueueStats(storeId: string): Promise<{
+function queueStatsFromActiveQueue(queue: QueueEntry[]): {
   waitingCount: number;
   estimatedWait: number;
   currentTicket: number | null;
-}> {
-  const queue = await getQueueByStore(storeId);
+} {
   const waiting = queue.filter((q) => q.status === "WAITING");
   const called = queue.filter((q) => q.status === "CALLED");
   return {
@@ -549,6 +553,15 @@ export async function getQueueStats(storeId: string): Promise<{
     estimatedWait: waiting.length * 5,
     currentTicket: called.length > 0 ? called[called.length - 1].ticketNumber : null,
   };
+}
+
+export async function getQueueStats(storeId: string): Promise<{
+  waitingCount: number;
+  estimatedWait: number;
+  currentTicket: number | null;
+}> {
+  const db = await readDatabase();
+  return queueStatsFromActiveQueue(getActiveQueueForStore(db, storeId));
 }
 
 export async function getQueueHistory(storeId: string): Promise<QueueEntry[]> {
@@ -620,18 +633,13 @@ function formatPortalHours(s: StoreSettings): string {
 
 const FALLBACK_PORTAL_IMAGE = "https://picsum.photos/seed/etable-portal/400/300";
 
-/**
- * アカウントが存在する店舗のみ公開（マスタの店舗 ID と紐づく画面向け）
- */
-export async function getStorePortalProfile(storeId: string): Promise<StorePortalProfile | null> {
-  const account = await getAccountById(storeId);
-  if (!account || account.status !== "ACTIVE") {
-    return null;
-  }
-  const s = normalizeStoreSettings(await getStoreSettings(storeId));
-  const stats = await getQueueStats(storeId);
-  const waitingGroups = stats.waitingCount;
-  const estimated = stats.estimatedWait;
+function storePortalProfileFromParts(
+  storeId: string,
+  account: Account,
+  s: StoreSettings,
+  waitingGroups: number,
+  estimated: number
+): StorePortalProfile {
   const approxWaitText = waitingGroups === 0 ? "空いています" : `約${estimated}分`;
   const name = s.portalDisplayName?.trim() || account.storeName;
   const imageUrl = s.portalImageUrl?.trim() || FALLBACK_PORTAL_IMAGE;
@@ -656,11 +664,57 @@ export async function getStorePortalProfile(storeId: string): Promise<StorePorta
   };
 }
 
+/**
+ * 同一 DB スナップショット上でポータル用プロフィールを組み立てる（一覧 API の一貫性用）
+ */
+function buildPortalProfileFromDbSnapshot(db: Database, account: Account): StorePortalProfile | null {
+  if (account.status !== "ACTIVE") return null;
+  if (!db.storeSettings) db.storeSettings = [];
+  let raw = db.storeSettings.find((x) => x.storeId === account.id);
+  if (!raw) {
+    raw = getDefaultStoreSettings(account.id);
+    db.storeSettings.push(raw);
+  }
+  const s = normalizeStoreSettings(raw);
+  const queue = getActiveQueueForStore(db, account.id);
+  const { waitingCount: waitingGroups, estimatedWait: estimated } = queueStatsFromActiveQueue(queue);
+  return storePortalProfileFromParts(account.id, account, s, waitingGroups, estimated);
+}
+
+/**
+ * アカウントが存在する店舗のみ公開（マスタの店舗 ID と紐づく画面向け）
+ */
+export async function getStorePortalProfile(storeId: string): Promise<StorePortalProfile | null> {
+  const db = await readDatabase();
+  const account = db.accounts.find((a) => a.id === storeId);
+  if (!account || account.status !== "ACTIVE") {
+    return null;
+  }
+  if (!db.storeSettings) db.storeSettings = [];
+  const hadSettingsRow = db.storeSettings.some((s) => s.storeId === storeId);
+  const profile = buildPortalProfileFromDbSnapshot(db, account);
+  if (!hadSettingsRow) await persistDatabase();
+  return profile;
+}
+
 export async function listActiveStoreProfiles(): Promise<StorePortalProfile[]> {
-  const accounts = await getAllAccounts();
-  const active = accounts.filter((a) => a.status === "ACTIVE");
-  const profiles = await Promise.all(active.map((a) => getStorePortalProfile(a.id)));
-  return profiles.filter((p): p is StorePortalProfile => p !== null);
+  const db = await readDatabase();
+  if (!db.storeSettings) db.storeSettings = [];
+  const active = db.accounts.filter((a) => a.status === "ACTIVE");
+  let needPersist = false;
+  const out: StorePortalProfile[] = [];
+  for (const account of active) {
+    try {
+      const missingSettings = !db.storeSettings.some((s) => s.storeId === account.id);
+      const p = buildPortalProfileFromDbSnapshot(db, account);
+      if (missingSettings) needPersist = true;
+      if (p) out.push(p);
+    } catch (e) {
+      console.error("[listActiveStoreProfiles]", account.id, e);
+    }
+  }
+  if (needPersist) await persistDatabase();
+  return out;
 }
 
 export async function getStoreSettings(storeId: string): Promise<StoreSettings> {

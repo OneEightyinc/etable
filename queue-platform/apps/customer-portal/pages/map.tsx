@@ -34,7 +34,7 @@ const MapPage: React.FC = () => {
       <section className="px-5 pt-6">
         <Link
           href="/mypage"
-          className="block rounded-[22px] border border-[#FD780F] bg-white py-4 text-center text-[14px] font-bold text-[#FD780F]"
+          className="block rounded-[22px] border border-[#ff6b00] bg-white py-4 text-center text-[14px] font-bold text-[#ff6b00]"
         >
           マイページ登録・確認
         </Link>

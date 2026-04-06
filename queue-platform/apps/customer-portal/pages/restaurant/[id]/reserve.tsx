@@ -38,28 +38,56 @@ const ReservePage: React.FC = () => {
   const [count, setCount] = useState(2);
   const [seatType, setSeatType] = useState("テーブル席");
   const [agreed, setAgreed] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const decrease = () => setCount((prev) => Math.max(1, prev - 1));
   const increase = () => setCount((prev) => Math.min(10, prev + 1));
 
-  const handleConfirmReservation = () => {
-    if (!restaurant || !agreed) return;
-
-    const item = {
-      id: Math.random().toString(36).slice(2),
-      restaurantId: restaurant.id,
-      restaurantName: restaurant.name,
-      peopleCount: count,
-      seatType,
-      ticketNumber: Math.floor(100 + Math.random() * 900),
-      waitingGroups: restaurant.waitingGroups,
-      waitMinutes: restaurant.shortestWaitMinutes ?? 12,
-      status: "waiting" as const,
-      createdAt: new Date().toISOString(),
-    };
-
-    addReservation(item);
-    router.push(`/restaurant/${restaurantId}/status`);
+  const handleConfirmReservation = async () => {
+    if (!restaurant || !agreed || !restaurantId || submitting) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/queue/join", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          storeId: restaurantId,
+          peopleCount: count,
+          seatType,
+        }),
+      });
+      const data = (await res.json()) as {
+        error?: string;
+        entry?: { id: string; ticketNumber: number };
+        position?: number;
+        estimatedWait?: number;
+      };
+      if (!res.ok || !data.entry || data.position === undefined || data.estimatedWait === undefined) {
+        throw new Error(data.error || "join failed");
+      }
+      const item = {
+        id: Math.random().toString(36).slice(2),
+        restaurantId: restaurant.id,
+        restaurantName: restaurant.name,
+        peopleCount: count,
+        seatType,
+        ticketNumber: data.entry.ticketNumber,
+        waitingGroups: data.position,
+        waitMinutes: data.estimatedWait,
+        baselineQueuePosition: data.position,
+        baselineWaitMinutes: data.estimatedWait,
+        queueEntryId: data.entry.id,
+        status: "waiting" as const,
+        createdAt: new Date().toISOString(),
+      };
+      addReservation(item);
+      await router.push(`/restaurant/${restaurantId}/status`);
+    } catch (e) {
+      console.error(e);
+      alert("順番待ちの登録に失敗しました。時間をおいて再度お試しください。");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (!router.isReady || (restaurantId && loading)) {
@@ -79,7 +107,7 @@ const ReservePage: React.FC = () => {
   }
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-[393px] bg-[#fafafa] pb-[96px]">
+    <main className="mx-auto min-h-screen w-full max-w-[393px] bg-white pb-[96px]">
       {/* Header */}
       <header className="sticky top-0 z-20 bg-white border-b border-[#f3f3f3]">
         <div className="relative flex h-[56px] items-center justify-center px-4">
@@ -186,13 +214,13 @@ const ReservePage: React.FC = () => {
       <section className="px-4 pt-6 pb-8">
         <button
           type="button"
-          onClick={handleConfirmReservation}
-          disabled={!agreed}
+          onClick={() => void handleConfirmReservation()}
+          disabled={!agreed || submitting}
           className={`block w-full rounded-full py-4 text-center text-[17px] font-bold text-white transition shadow-[0_4px_14px_rgba(255,107,0,0.35)] ${
-            agreed ? "bg-[#ff6b00] hover:opacity-95" : "cursor-not-allowed bg-[#d4d4d8]"
+            agreed && !submitting ? "bg-[#ff6b00] hover:opacity-95" : "cursor-not-allowed bg-[#d4d4d8]"
           }`}
         >
-          順番待ちを確定する
+          {submitting ? "登録中…" : "順番待ちを確定する"}
         </button>
       </section>
 

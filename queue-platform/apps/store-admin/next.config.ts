@@ -4,7 +4,7 @@ import type { NextConfig } from "next";
 const monorepoRoot = path.join(__dirname, "..", "..");
 
 const nextConfig: NextConfig = {
-  assetPrefix: "https://store-admin-v2-rosy.vercel.app",
+  assetPrefix: process.env.VERCEL ? "https://store-admin-v2-rosy.vercel.app" : undefined,
   env: {
     NEXT_PUBLIC_API_PREFIX: "/store",
   },

@@ -105,8 +105,8 @@ function SelectionButton({
       onClick={onClick}
       className={`w-full rounded-xl px-4 py-3.5 text-[15px] font-medium transition-colors ${
         selected
-          ? "bg-[#FD780F] text-white shadow-sm"
-          : "bg-white border border-gray-200 text-[#333] hover:border-[#FD780F]/40"
+          ? "bg-[#ff6b00] text-white shadow-sm"
+          : "bg-white border border-gray-200 text-[#333] hover:border-[#ff6b00]/40"
       }`}
     >
       {children}
@@ -126,7 +126,7 @@ function ProgressBar({ step }: { step: number }) {
       </div>
       <div className="h-2 w-full rounded-full bg-gray-100 overflow-hidden">
         <div
-          className="h-full rounded-full bg-[#FD780F] transition-all duration-300"
+          className="h-full rounded-full bg-[#ff6b00] transition-all duration-300"
           style={{ width: `${pct}%` }}
         />
       </div>
@@ -152,7 +152,7 @@ function StarRating({
           aria-label={`${star}つ星`}
         >
           {star <= value ? (
-            <span className="text-[#FD780F]">★</span>
+            <span className="text-[#ff6b00]">★</span>
           ) : (
             <span className="text-gray-300">☆</span>
           )}
@@ -458,7 +458,7 @@ export default function SurveyPage() {
               value={formData.menuRequest}
               onChange={(e) => update("menuRequest", e.target.value)}
               placeholder="例: チーズバーガー、抹茶ラテ"
-              className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-[15px] text-[#333] placeholder-gray-400 focus:border-[#FD780F] focus:outline-none focus:ring-1 focus:ring-[#FD780F]"
+              className="w-full rounded-xl border border-gray-200 px-4 py-3.5 text-[15px] text-[#333] placeholder-gray-400 focus:border-[#ff6b00] focus:outline-none focus:ring-1 focus:ring-[#ff6b00]"
             />
             <p className="mt-2 text-[12px] text-[#999]">任意項目です</p>
           </div>
@@ -473,7 +473,7 @@ export default function SurveyPage() {
               onChange={(v) => update("satisfaction", v)}
             />
             {formData.satisfaction > 0 && (
-              <p className="mt-4 text-[14px] font-medium text-[#FD780F]">
+              <p className="mt-4 text-[14px] font-medium text-[#ff6b00]">
                 {formData.satisfaction} / 5
               </p>
             )}
@@ -494,8 +494,8 @@ export default function SurveyPage() {
                 onClick={() => update("wouldWaitAgain", o.value)}
                 className={`rounded-2xl py-8 text-[18px] font-bold transition-colors ${
                   formData.wouldWaitAgain === o.value
-                    ? "bg-[#FD780F] text-white shadow-md"
-                    : "bg-white border-2 border-gray-200 text-[#333] hover:border-[#FD780F]/40"
+                    ? "bg-[#ff6b00] text-white shadow-md"
+                    : "bg-white border-2 border-gray-200 text-[#333] hover:border-[#ff6b00]/40"
                 }`}
               >
                 {o.label}
@@ -533,7 +533,7 @@ export default function SurveyPage() {
                 value={formData.area}
                 onChange={(e) => update("area", e.target.value)}
                 placeholder="例: 渋谷区、横浜市"
-                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-[15px] text-[#333] placeholder-gray-400 focus:border-[#FD780F] focus:outline-none focus:ring-1 focus:ring-[#FD780F]"
+                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-[15px] text-[#333] placeholder-gray-400 focus:border-[#ff6b00] focus:outline-none focus:ring-1 focus:ring-[#ff6b00]"
               />
             </div>
             <div>
@@ -545,7 +545,7 @@ export default function SurveyPage() {
                 value={formData.workplace}
                 onChange={(e) => update("workplace", e.target.value)}
                 placeholder="例: 新宿区、品川区"
-                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-[15px] text-[#333] placeholder-gray-400 focus:border-[#FD780F] focus:outline-none focus:ring-1 focus:ring-[#FD780F]"
+                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-[15px] text-[#333] placeholder-gray-400 focus:border-[#ff6b00] focus:outline-none focus:ring-1 focus:ring-[#ff6b00]"
               />
             </div>
             <div>
@@ -555,7 +555,7 @@ export default function SurveyPage() {
               <select
                 value={formData.occupation}
                 onChange={(e) => update("occupation", e.target.value)}
-                className="w-full appearance-none rounded-xl border border-gray-200 bg-white px-4 py-3 text-[15px] text-[#333] focus:border-[#FD780F] focus:outline-none focus:ring-1 focus:ring-[#FD780F]"
+                className="w-full appearance-none rounded-xl border border-gray-200 bg-white px-4 py-3 text-[15px] text-[#333] focus:border-[#ff6b00] focus:outline-none focus:ring-1 focus:ring-[#ff6b00]"
               >
                 {OCCUPATION_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value}>
@@ -581,7 +581,7 @@ export default function SurveyPage() {
               onChange={(e) => update("comment", e.target.value)}
               rows={4}
               placeholder="ご自由にどうぞ..."
-              className="w-full rounded-xl border border-gray-200 px-4 py-3 text-[15px] text-[#333] placeholder-gray-400 resize-none focus:border-[#FD780F] focus:outline-none focus:ring-1 focus:ring-[#FD780F]"
+              className="w-full rounded-xl border border-gray-200 px-4 py-3 text-[15px] text-[#333] placeholder-gray-400 resize-none focus:border-[#ff6b00] focus:outline-none focus:ring-1 focus:ring-[#ff6b00]"
             />
             <p className="mt-2 text-[12px] text-[#999]">任意項目です</p>
           </div>
@@ -650,7 +650,7 @@ export default function SurveyPage() {
                 disabled={!canProceed()}
                 className={`flex-1 rounded-xl py-3.5 text-[15px] font-bold text-white transition-colors ${
                   canProceed()
-                    ? "bg-[#FD780F] active:bg-[#e56b08]"
+                    ? "bg-[#ff6b00] active:bg-[#cf4a22]"
                     : "bg-gray-300 cursor-not-allowed"
                 }`}
               >

@@ -84,6 +84,8 @@ const ReservationStatusPage: React.FC = () => {
   const { restaurant } = useRestaurantById(restaurantId);
 
   const [reservation, setReservation] = useState<ReservationItem | null>(null);
+  const [livePosition, setLivePosition] = useState<number | null>(null);
+  const [liveEstimatedWait, setLiveEstimatedWait] = useState<number | null>(null);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [isDelayModalOpen, setIsDelayModalOpen] = useState(false);
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
@@ -99,6 +101,36 @@ const ReservationStatusPage: React.FC = () => {
     setReservation(list.length > 0 ? list[0] : null);
   }, [restaurantId]);
 
+  useEffect(() => {
+    if (!restaurantId || !reservation?.queueEntryId) {
+      setLivePosition(null);
+      setLiveEstimatedWait(null);
+      return;
+    }
+    const entryId = reservation.queueEntryId;
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const res = await fetch(
+          `/api/queue/position?storeId=${encodeURIComponent(restaurantId)}&entryId=${encodeURIComponent(entryId)}`
+        );
+        if (!res.ok) return;
+        const data = (await res.json()) as { position: number; estimatedWait: number };
+        if (cancelled) return;
+        setLivePosition(data.position);
+        setLiveEstimatedWait(data.estimatedWait);
+      } catch {
+        /* ignore */
+      }
+    };
+    void tick();
+    const interval = setInterval(tick, 8000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [restaurantId, reservation?.queueEntryId]);
+
   const refreshReservation = () => {
     const list = getReservations().filter(
       (r) => r.restaurantId === restaurantId && r.status === "waiting"
@@ -106,8 +138,19 @@ const ReservationStatusPage: React.FC = () => {
     setReservation(list.length > 0 ? list[0] : null);
   };
 
-  const handleCancel = () => {
+  const handleCancel = async () => {
     if (!reservation) return;
+    if (reservation.queueEntryId) {
+      try {
+        await fetch("/api/queue/cancel", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ entryId: reservation.queueEntryId }),
+        });
+      } catch {
+        /* ローカルは必ず解除する */
+      }
+    }
     updateReservationStatus(reservation.id, "cancelled");
     setIsCancelModalOpen(false);
     setReservation(null);
@@ -164,7 +207,7 @@ const ReservationStatusPage: React.FC = () => {
   /* --- Empty state --- */
   if (!reservation) {
     return (
-      <main className="mx-auto min-h-screen w-full max-w-[393px] bg-[#fafafa] pb-[96px]">
+      <main className="mx-auto min-h-screen w-full max-w-[393px] bg-white pb-[96px]">
         <header className="sticky top-0 z-20 border-b border-[#f3f3f3] bg-white">
           <div className="relative flex h-[56px] items-center justify-center px-4">
             <Link href={`/restaurant/${restaurantId}`} className="absolute left-4 flex h-9 w-9 items-center justify-center rounded-full hover:bg-[#f5f5f5]">
@@ -185,13 +228,21 @@ const ReservationStatusPage: React.FC = () => {
   }
 
   const r = reservation;
-  const waitingGroups = r.waitingGroups;
-  const waitMinutes = r.waitMinutes;
+  const baselinePos = r.baselineQueuePosition ?? r.waitingGroups;
+  const baselineWait = r.baselineWaitMinutes ?? r.waitMinutes;
+  const waitingGroups =
+    r.queueEntryId != null && livePosition != null
+      ? Math.max(0, livePosition + (r.waitingGroups - baselinePos))
+      : r.waitingGroups;
+  const waitMinutes =
+    r.queueEntryId != null && liveEstimatedWait != null
+      ? Math.max(0, liveEstimatedWait + (r.waitMinutes - baselineWait))
+      : r.waitMinutes;
   const shortestMinutes = restaurant?.shortestWaitMinutes ?? waitMinutes;
 
   return (
     <>
-      <main className="mx-auto min-h-screen w-full max-w-[393px] bg-[#fafafa] pb-[96px]">
+      <main className="mx-auto min-h-screen w-full max-w-[393px] bg-white pb-[96px]">
         <div className="px-4 pt-6">
           {/* YOUR TICKET */}
           <section className="mb-4 rounded-[20px] border border-[#ff6b00] bg-white p-5 shadow-[0_4px_16px_rgba(255,107,0,0.12)]">
@@ -211,6 +262,9 @@ const ReservationStatusPage: React.FC = () => {
               <span className="text-[84px] font-bold leading-none tracking-[-2px]">{waitingGroups}</span>
               <span className="pb-3 text-[24px] font-bold">組待ち</span>
             </div>
+            {waitingGroups === 0 && (
+              <p className="-mt-1 text-center text-[15px] font-semibold text-white/95">あなたの前にお待ちの組はありません</p>
+            )}
             <div className="my-7 h-px bg-white/25" />
             <div className="grid grid-cols-2 text-center">
               <div>
@@ -319,7 +373,7 @@ const ReservationStatusPage: React.FC = () => {
             </div>
           </section>
 
-          <section className="rounded-[20px] border border-[#ececec] bg-[#fafafa] px-4 py-4">
+          <section className="rounded-[20px] border border-[#ececec] bg-white px-4 py-4">
             <p className="text-center text-[13px] leading-relaxed text-[#6b7280]">
               周辺のおすすめスポットは現在表示していません。
             </p>
@@ -331,7 +385,13 @@ const ReservationStatusPage: React.FC = () => {
 
       {/* Modals */}
       {isCancelModalOpen && (
-        <Modal title="キャンセルしますか？" confirmText="はい、キャンセルします" onClose={() => setIsCancelModalOpen(false)} onConfirm={handleCancel} confirmColor="red" />
+        <Modal
+          title="キャンセルしますか？"
+          confirmText="はい、キャンセルします"
+          onClose={() => setIsCancelModalOpen(false)}
+          onConfirm={() => void handleCancel()}
+          confirmColor="red"
+        />
       )}
       {isDelayModalOpen && (
         <Modal title="順番を後回しにしますか？" confirmText="はい、後回しにします" onClose={() => setIsDelayModalOpen(false)} onConfirm={handleDelay} confirmColor="orange">

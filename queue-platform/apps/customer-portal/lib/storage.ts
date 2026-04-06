@@ -9,6 +9,12 @@ export interface ReservationItem {
   waitMinutes: number;
   status: "waiting" | "cancelled";
   createdAt: string;
+  /** 店舗キュー上のエントリ ID（API 参加時のみ） */
+  queueEntryId?: string;
+  /** 登録直後の「前の組数」基準（「順番を後回し」で増分を表示するため） */
+  baselineQueuePosition?: number;
+  /** 登録直後の目安待ち（分）基準 */
+  baselineWaitMinutes?: number;
 }
 
 export interface FavoriteItem {
@@ -23,6 +29,29 @@ function generateId(): string {
 
 const RESERVATIONS_KEY = "etable_reservations";
 const FAVORITES_KEY = "etable_favorites";
+const TRANSPORT_PREF_KEY = "etable_transport_pref";
+
+export type TransportPreference = "public" | "car";
+
+export function getTransportPreference(): TransportPreference {
+  if (typeof window === "undefined") return "public";
+  try {
+    const v = localStorage.getItem(TRANSPORT_PREF_KEY);
+    if (v === "car" || v === "public") return v;
+  } catch {
+    /* ignore */
+  }
+  return "public";
+}
+
+export function setTransportPreference(v: TransportPreference): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(TRANSPORT_PREF_KEY, v);
+  } catch {
+    /* ignore */
+  }
+}
 
 export function getReservations(): ReservationItem[] {
   if (typeof window === "undefined") return [];

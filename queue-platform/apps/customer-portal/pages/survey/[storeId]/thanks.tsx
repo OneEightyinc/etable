@@ -36,7 +36,7 @@ export default function SurveyThanksPage() {
 
         <Link
           href="/"
-          className="inline-block rounded-xl bg-[#FD780F] px-10 py-3.5 text-[15px] font-bold text-white shadow-sm transition-colors hover:bg-[#e56b08] active:bg-[#d4600a]"
+          className="inline-block rounded-xl bg-[#ff6b00] px-10 py-3.5 text-[15px] font-bold text-white shadow-sm transition-colors hover:bg-[#cf4a22] active:bg-[#b63d1a]"
         >
           お店に戻る
         </Link>

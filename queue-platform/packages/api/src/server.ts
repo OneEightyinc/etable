@@ -7,6 +7,7 @@
 // Database layer
 export {
   hashPassword,
+  isRemoteDbEnabled,
   findAdminByEmail,
   findAccountByEmail,
   getAllAccounts,

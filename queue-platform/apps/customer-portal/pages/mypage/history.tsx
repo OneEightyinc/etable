@@ -80,19 +80,31 @@ export default function MypageHistoryPage() {
                     const label = `${parseInt(mo!, 10)}月${parseInt(d!, 10)}日 来店`;
                     const src = row.imageUrl ?? RESTAURANT_IMAGE_PLACEHOLDER;
                     return (
-                      <Link
+                      <div
                         key={row.id}
-                        href={`/restaurant/${encodeURIComponent(row.restaurantId)}`}
-                        className="flex items-center gap-3 rounded-[16px] border border-[#eee] bg-white p-3 shadow-[0_2px_8px_rgba(0,0,0,0.06)]"
+                        className="overflow-hidden rounded-[16px] border border-[#eee] bg-white shadow-[0_2px_8px_rgba(0,0,0,0.06)]"
                       >
-                        <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-[#f0f0f0]">
-                          <Image src={src} alt="" fill className="object-cover" sizes="56px" unoptimized />
+                        <Link
+                          href={`/restaurant/${encodeURIComponent(row.restaurantId)}`}
+                          className="flex items-center gap-3 p-3"
+                        >
+                          <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-[#f0f0f0]">
+                            <Image src={src} alt="" fill className="object-cover" sizes="56px" unoptimized />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-[14px] font-bold text-[#111]">{row.restaurantName}</p>
+                            <p className="text-[12px] text-[#999]">{label}</p>
+                          </div>
+                        </Link>
+                        <div className="border-t border-[#f5f5f5] px-3 pb-3">
+                          <Link
+                            href={`/survey/${encodeURIComponent(row.restaurantId)}`}
+                            className="block w-full rounded-full border border-[#ff6b00] py-2.5 text-center text-[13px] font-bold text-[#ff6b00]"
+                          >
+                            来店アンケートに回答する
+                          </Link>
                         </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-[14px] font-bold text-[#111]">{row.restaurantName}</p>
-                          <p className="text-[12px] text-[#999]">{label}</p>
-                        </div>
-                      </Link>
+                      </div>
                     );
                   })}
                 </div>

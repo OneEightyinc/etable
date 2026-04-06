@@ -619,24 +619,36 @@ const MyPage: React.FC = () => {
                   </div>
                   <div className="space-y-3">
                     {waitingReservations.slice(0, 2).map((r) => (
-                      <Link
+                      <div
                         key={r.id}
-                        href={`/restaurant/${encodeURIComponent(r.restaurantId)}/status`}
-                        className="block overflow-hidden rounded-[20px] border border-[#e5e5e5] bg-white shadow-[0_2px_12px_rgba(0,0,0,0.06)]"
+                        className="overflow-hidden rounded-[20px] border border-[#e5e5e5] bg-white shadow-[0_2px_12px_rgba(0,0,0,0.06)]"
                       >
-                        <div className="relative h-24 w-full bg-[#f0f0f0]">
-                          <ReservationThumb restaurantId={r.restaurantId} name={r.restaurantName} />
-                          <span className="absolute left-3 top-3 rounded-full bg-[#ff6b00] px-2 py-1 text-[11px] font-bold text-white">
-                            順番待ち
-                          </span>
+                        <Link
+                          href={`/restaurant/${encodeURIComponent(r.restaurantId)}/status`}
+                          className="block"
+                        >
+                          <div className="relative h-24 w-full bg-[#f0f0f0]">
+                            <ReservationThumb restaurantId={r.restaurantId} name={r.restaurantName} />
+                            <span className="absolute left-3 top-3 rounded-full bg-[#ff6b00] px-2 py-1 text-[11px] font-bold text-white">
+                              順番待ち
+                            </span>
+                          </div>
+                          <div className="p-3">
+                            <p className="text-[14px] font-bold text-[#111]">{r.restaurantName}</p>
+                            <p className="text-[12px] text-[#666]">
+                              NO.{r.ticketNumber} あと{r.waitingGroups}組
+                            </p>
+                          </div>
+                        </Link>
+                        <div className="border-t border-[#f3f3f3] px-3 pb-3">
+                          <Link
+                            href={`/survey/${encodeURIComponent(r.restaurantId)}`}
+                            className="block w-full rounded-full border border-[#ff6b00] py-2 text-center text-[12px] font-bold text-[#ff6b00]"
+                          >
+                            来店アンケートに回答する
+                          </Link>
                         </div>
-                        <div className="p-3">
-                          <p className="text-[14px] font-bold text-[#111]">{r.restaurantName}</p>
-                          <p className="text-[12px] text-[#666]">
-                            NO.{r.ticketNumber} あと{r.waitingGroups}組
-                          </p>
-                        </div>
-                      </Link>
+                      </div>
                     ))}
                   </div>
                 </section>

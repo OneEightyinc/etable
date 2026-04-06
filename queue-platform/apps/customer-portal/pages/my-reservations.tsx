@@ -109,43 +109,55 @@ const MyReservations: React.FC = () => {
               {reservations.map((r) => {
                 const imageUrl = images[r.restaurantId] ?? RESTAURANT_IMAGE_PLACEHOLDER;
                 return (
-                  <Link
+                  <div
                     key={r.id}
-                    href={`/restaurant/${encodeURIComponent(r.restaurantId)}/status`}
-                    className="block overflow-hidden rounded-[24px] border border-[#e5e5e5] bg-white shadow-[0px_1px_3px_0px_rgba(0,0,0,0.1),0px_1px_2px_-1px_rgba(0,0,0,0.1)]"
+                    className="overflow-hidden rounded-[24px] border border-[#e5e5e5] bg-white shadow-[0px_1px_3px_0px_rgba(0,0,0,0.1),0px_1px_2px_-1px_rgba(0,0,0,0.1)]"
                   >
-                    <div className="relative h-[140px] w-full bg-[#f0f0f0]">
-                      <Image
-                        src={imageUrl}
-                        alt={r.restaurantName}
-                        fill
-                        className="object-cover"
-                        sizes="393px"
-                        unoptimized
-                      />
-                      <span className="absolute left-4 top-4 rounded-full bg-[#ff6b00] px-3 py-1.5 text-[12px] font-bold text-white shadow-[0_2px_6px_rgba(0,0,0,0.15)]">
-                        順番待ち
-                      </span>
-                    </div>
-                    <div className="p-4">
-                      <div className="mb-2 flex items-center gap-2">
-                        <span className="text-[12px] font-bold text-[#999]">NO.</span>
-                        <span className="text-[18px] font-bold text-[#ff6b00]">{r.ticketNumber}</span>
-                      </div>
-                      <h3 className="mb-3 text-[17px] font-bold leading-snug text-[#111]">{r.restaurantName}</h3>
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[14px] text-[#666]">
-                        <span>あと{r.waitingGroups}組</span>
-                        <span>約{r.waitMinutes}分</span>
-                        {r.peopleCount > 0 ? <span>{r.peopleCount}名</span> : null}
-                      </div>
-                      <div className="mt-3 flex items-center justify-end">
-                        <span className="flex items-center gap-1 text-[14px] font-bold text-[#ff6b00]">
-                          詳細を見る
-                          <ChevronRightIcon className="h-5 w-5" />
+                    <Link
+                      href={`/restaurant/${encodeURIComponent(r.restaurantId)}/status`}
+                      className="block"
+                    >
+                      <div className="relative h-[140px] w-full bg-[#f0f0f0]">
+                        <Image
+                          src={imageUrl}
+                          alt={r.restaurantName}
+                          fill
+                          className="object-cover"
+                          sizes="393px"
+                          unoptimized
+                        />
+                        <span className="absolute left-4 top-4 rounded-full bg-[#ff6b00] px-3 py-1.5 text-[12px] font-bold text-white shadow-[0_2px_6px_rgba(0,0,0,0.15)]">
+                          順番待ち
                         </span>
                       </div>
+                      <div className="p-4">
+                        <div className="mb-2 flex items-center gap-2">
+                          <span className="text-[12px] font-bold text-[#999]">NO.</span>
+                          <span className="text-[18px] font-bold text-[#ff6b00]">{r.ticketNumber}</span>
+                        </div>
+                        <h3 className="mb-3 text-[17px] font-bold leading-snug text-[#111]">{r.restaurantName}</h3>
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[14px] text-[#666]">
+                          <span>あと{r.waitingGroups}組</span>
+                          <span>約{r.waitMinutes}分</span>
+                          {r.peopleCount > 0 ? <span>{r.peopleCount}名</span> : null}
+                        </div>
+                        <div className="mt-3 flex items-center justify-end">
+                          <span className="flex items-center gap-1 text-[14px] font-bold text-[#ff6b00]">
+                            詳細を見る
+                            <ChevronRightIcon className="h-5 w-5" />
+                          </span>
+                        </div>
+                      </div>
+                    </Link>
+                    <div className="border-t border-[#f3f3f3] bg-[#fffaf7] px-4 py-3">
+                      <Link
+                        href={`/survey/${encodeURIComponent(r.restaurantId)}`}
+                        className="flex w-full items-center justify-center rounded-full border border-[#ff6b00] bg-white py-3 text-[14px] font-bold text-[#ff6b00] shadow-[0_2px_8px_rgba(255,107,0,0.12)]"
+                      >
+                        来店アンケートに回答する
+                      </Link>
                     </div>
-                  </Link>
+                  </div>
                 );
               })}
             </div>

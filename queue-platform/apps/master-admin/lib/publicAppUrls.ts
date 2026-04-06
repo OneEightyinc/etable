@@ -55,3 +55,10 @@ export function appendStoreQuery(base: string, storeId: string): string {
   const q = `storeId=${encodeURIComponent(storeId)}`;
   return base.includes("?") ? `${base}&${q}` : `${base}?${q}`;
 }
+
+/** 顧客ポータル上の来店アンケート（/survey/[storeId]） */
+export function surveyUrlForStore(customerPortalBase: string, storeId: string): string {
+  const base = trimBase(customerPortalBase);
+  if (!base) return "#";
+  return `${base}/survey/${encodeURIComponent(storeId)}`;
+}

@@ -6,6 +6,7 @@ import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 import { Redis } from "@upstash/redis";
+import { waitingIndexForEntry, waitingLineEntries } from "./queue-waiting-line";
 
 // ─── Types ───────────────────────────────────────────────
 export interface AdminUser {
@@ -533,8 +534,16 @@ export async function getQueuePosition(
   entryId: string
 ): Promise<{ position: number; estimatedWait: number } | null> {
   const queue = await getQueueByStore(storeId);
-  const idx = queue.findIndex((q) => q.id === entryId);
-  if (idx === -1) return null;
+  const entry = queue.find((q) => q.id === entryId);
+  if (!entry) return null;
+  if (entry.status === "CALLED") {
+    return { position: 0, estimatedWait: 0 };
+  }
+  if (entry.status === "DONE" || entry.status === "CANCELLED") {
+    return null;
+  }
+  const idx = waitingIndexForEntry(queue, entryId);
+  if (idx < 0) return null;
   return {
     position: idx,
     estimatedWait: idx * 5,
@@ -546,11 +555,11 @@ function queueStatsFromActiveQueue(queue: QueueEntry[]): {
   estimatedWait: number;
   currentTicket: number | null;
 } {
-  const waiting = queue.filter((q) => q.status === "WAITING");
+  const inLine = waitingLineEntries(queue);
   const called = queue.filter((q) => q.status === "CALLED");
   return {
-    waitingCount: waiting.length,
-    estimatedWait: waiting.length * 5,
+    waitingCount: inLine.length,
+    estimatedWait: inLine.length * 5,
     currentTicket: called.length > 0 ? called[called.length - 1].ticketNumber : null,
   };
 }

@@ -32,3 +32,10 @@ export type {
   QueueEntryData,
   StoreSettingsData,
 } from './api-client';
+
+export {
+  waitingLineEntries,
+  waitingIndexForEntry,
+  waitingLineGroupCount,
+  isInWaitingLineStatus,
+} from './queue-waiting-line';

@@ -201,6 +201,133 @@ const initialFormData: FormData = {
   comment: "",
 };
 
+/** フォーム状態 → POST /api/survey/submit が期待するボディ（survey-schema 準拠） */
+function buildSurveySubmitBody(storeId: string, d: FormData) {
+  const ageGroupMap: Record<string, string> = {
+    "10s": "teens",
+    "20s": "20s_early",
+    "30s": "30s_early",
+    "40s": "40s",
+    "50s": "50s_plus",
+    "60plus": "50s_plus",
+  };
+  const groupTypeMap: Record<string, string> = {
+    alone: "solo",
+    friends: "friends",
+    couple: "couple",
+    family: "family",
+    business: "business",
+  };
+  const stayMap: Record<string, string> = {
+    under_30: "under_30min",
+    "30_to_60": "30to60min",
+    "60_to_120": "1to2hours",
+    over_120: "over_2hours",
+  };
+  const visitCountMap: Record<string, string> = {
+    first: "first",
+    "2_3": "second_third",
+    regular: "regular",
+  };
+  const channelMap: Record<string, string> = {
+    instagram: "instagram",
+    tiktok: "tiktok",
+    twitter: "x_twitter",
+    google_maps: "google_maps",
+    passerby: "walk_in",
+    friend_referral: "referral",
+    web_media: "web_media",
+  };
+  const occupationMap: Record<string, string> = {
+    office_worker: "employee",
+    self_employed: "self_employed",
+    part_time: "employee",
+    student: "student",
+    homemaker: "homemaker",
+    freelance: "freelance",
+    retired: "retired",
+    other: "other",
+  };
+
+  const acquisitionChannels = d.discovery.map((v) => channelMap[v] ?? v);
+  const occ = d.occupation && occupationMap[d.occupation];
+  const favoriteMenu = d.menuRequest.trim() ? d.menuRequest.trim().slice(0, 100) : null;
+  const etableReview = d.comment.trim() ? d.comment.trim().slice(0, 200) : null;
+  const residenceArea = d.area.trim() ? d.area.trim().slice(0, 50) : null;
+  const workArea = d.workplace.trim() ? d.workplace.trim().slice(0, 50) : null;
+
+  return {
+    storeId,
+    gender: d.gender,
+    ageGroup: ageGroupMap[d.age] ?? d.age,
+    groupType: groupTypeMap[d.partyType] ?? d.partyType,
+    visitPurpose: d.purpose,
+    stayDuration: stayMap[d.stayDuration] ?? d.stayDuration,
+    visitCount: visitCountMap[d.visitCount] ?? d.visitCount,
+    budgetPerPerson: d.budget ?? 0,
+    acquisitionChannels,
+    favoriteMenu,
+    etableReview,
+    satisfactionScore: d.satisfaction,
+    waitTimeTolerance: d.wouldWaitAgain === "yes",
+    revisitIntention:
+      d.wouldRevisit === "yes"
+        ? "yes"
+        : d.wouldRevisit === "no"
+          ? "no"
+          : d.wouldRevisit === "considering"
+            ? "maybe"
+            : d.wouldRevisit,
+    residenceArea,
+    workArea,
+    occupation: occ ?? null,
+  };
+}
+
+/** そのステップで次へ進めないときのメッセージ（null なら OK） */
+function getStepBlockerMessage(step: number, d: FormData): string | null {
+  switch (step) {
+    case 1:
+      if (d.gender === "") return "性別を選択してください";
+      if (d.age === "") return "年代を選択してください";
+      return null;
+    case 2:
+      if (d.partyType === "") return "ご利用の形態を選択してください";
+      return null;
+    case 3:
+      if (d.purpose === "") return "ご利用目的を選択してください";
+      return null;
+    case 4:
+      if (d.stayDuration === "") return "滞在予定時間を選択してください";
+      return null;
+    case 5:
+      if (d.visitCount === "") return "来店回数を選択してください";
+      return null;
+    case 6:
+      if (d.budget === null) return "予算感を選択してください";
+      return null;
+    case 7:
+      if (d.discovery.length === 0) return "認知経路を1つ以上選択してください";
+      return null;
+    case 8:
+      return null;
+    case 9:
+      if (d.satisfaction <= 0) return "総合満足度を選択してください";
+      return null;
+    case 10:
+      if (d.wouldWaitAgain === "") return "「また待ちたいか」を選択してください";
+      return null;
+    case 11:
+      if (d.wouldRevisit === "") return "「また来たいか」を選択してください";
+      return null;
+    case 12:
+    case 13:
+      return null;
+    default:
+      return null;
+  }
+}
+
 /* ─── Main page ─── */
 
 export default function SurveyPage() {
@@ -242,41 +369,12 @@ export default function SurveyPage() {
     });
   }, []);
 
-  /* Per-step validation */
-  const canProceed = (): boolean => {
-    switch (step) {
-      case 1:
-        return formData.gender !== "" && formData.age !== "";
-      case 2:
-        return formData.partyType !== "";
-      case 3:
-        return formData.purpose !== "";
-      case 4:
-        return formData.stayDuration !== "";
-      case 5:
-        return formData.visitCount !== "";
-      case 6:
-        return formData.budget !== null;
-      case 7:
-        return formData.discovery.length > 0;
-      case 8:
-        return true; // optional
-      case 9:
-        return formData.satisfaction > 0;
-      case 10:
-        return formData.wouldWaitAgain !== "";
-      case 11:
-        return formData.wouldRevisit !== "";
-      case 12:
-        return true; // all optional
-      case 13:
-        return true; // optional
-      default:
-        return false;
-    }
-  };
-
   const handleNext = () => {
+    const msg = getStepBlockerMessage(step, formData);
+    if (msg) {
+      alert(msg);
+      return;
+    }
     if (step < TOTAL_STEPS) setStep(step + 1);
   };
 
@@ -286,15 +384,27 @@ export default function SurveyPage() {
 
   const handleSubmit = async () => {
     if (submitting) return;
+    if (!storeId) {
+      alert("店舗情報を読み込み中です。しばらく待ってから再度お試しください。");
+      return;
+    }
+    for (let s = 1; s <= 11; s++) {
+      const msg = getStepBlockerMessage(s, formData);
+      if (msg) {
+        alert(msg);
+        return;
+      }
+    }
     setSubmitting(true);
     setSubmitError("");
 
     const prefix = process.env.NEXT_PUBLIC_API_PREFIX ?? "";
+    const payload = buildSurveySubmitBody(storeId, formData);
     try {
       const res = await fetch(`${prefix}/api/survey/submit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ storeId, ...formData }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => null);
@@ -647,12 +757,7 @@ export default function SurveyPage() {
               <button
                 type="button"
                 onClick={handleNext}
-                disabled={!canProceed()}
-                className={`flex-1 rounded-xl py-3.5 text-[15px] font-bold text-white transition-colors ${
-                  canProceed()
-                    ? "bg-[#ff6b00] active:bg-[#cf4a22]"
-                    : "bg-gray-300 cursor-not-allowed"
-                }`}
+                className="flex-1 rounded-xl py-3.5 text-[15px] font-bold text-white transition-colors bg-[#ff6b00] active:bg-[#cf4a22]"
               >
                 次へ
               </button>

@@ -1,7 +1,12 @@
 
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { subscribeToQueue, type QueueEntryData } from '@queue-platform/api';
+import {
+  subscribeToQueue,
+  waitingIndexForEntry,
+  waitingLineGroupCount,
+  type QueueEntryData,
+} from '@queue-platform/api';
 
 interface CustomerViewProps {
   storeId?: string;
@@ -41,18 +46,24 @@ const CustomerView: React.FC<CustomerViewProps> = ({ storeId = 'shibuya-001', en
 
   const updateMyPosition = (queue: QueueEntryData[]) => {
     if (entryId) {
-      const myIdx = queue.findIndex((q) => q.id === entryId);
-      if (myIdx !== -1) {
-        setMyEntry(queue[myIdx]);
-        setPosition(myIdx);
-        setEstimatedWait(myIdx * 5);
-        if (queue[myIdx].status === 'CALLED') {
+      const row = queue.find((q) => q.id === entryId);
+      if (row) {
+        setMyEntry(row);
+        if (row.status === 'CALLED') {
           setIsCalled(true);
+          setPosition(0);
+          setEstimatedWait(0);
+        } else {
+          const myIdx = waitingIndexForEntry(queue, entryId);
+          if (myIdx >= 0) {
+            setPosition(myIdx);
+            setEstimatedWait(myIdx * 5);
+          }
         }
       }
     } else {
-      // Demo mode: show queue stats
-      const waitingCount = queue.filter((q) => q.status === 'WAITING').length;
+      // Demo mode: show queue stats（WAITING + HOLD を「待ち列」と同定）
+      const waitingCount = waitingLineGroupCount(queue);
       setPosition(waitingCount);
       setEstimatedWait(waitingCount * 5);
       setIsLoading(false);
@@ -66,7 +77,7 @@ const CustomerView: React.FC<CustomerViewProps> = ({ storeId = 'shibuya-001', en
         .then((r) => r.json())
         .then((data) => {
           if (data.queue) {
-            const waitingCount = data.queue.filter((q: QueueEntryData) => q.status === 'WAITING').length;
+            const waitingCount = waitingLineGroupCount(data.queue as QueueEntryData[]);
             setPosition(waitingCount);
             setEstimatedWait(waitingCount * 5);
           }

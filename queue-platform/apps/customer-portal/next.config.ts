@@ -5,16 +5,28 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [
       {
-        source: "/store/:path*",
-        destination: "https://store-admin-jade.vercel.app/store/:path*",
+        source: "/store",
+        destination: "https://store-admin-jade.vercel.app/store",
       },
       {
-        source: "/kiosk/:path*",
-        destination: "https://kiosk-eight-eta.vercel.app/kiosk/:path*",
+        source: "/store/:path+",
+        destination: "https://store-admin-jade.vercel.app/store/:path+",
       },
       {
-        source: "/admin/:path*",
-        destination: "https://master-admin-xi.vercel.app/admin/:path*",
+        source: "/kiosk",
+        destination: "https://kiosk-eight-eta.vercel.app/kiosk",
+      },
+      {
+        source: "/kiosk/:path+",
+        destination: "https://kiosk-eight-eta.vercel.app/kiosk/:path+",
+      },
+      {
+        source: "/admin",
+        destination: "https://master-admin-xi.vercel.app/admin",
+      },
+      {
+        source: "/admin/:path+",
+        destination: "https://master-admin-xi.vercel.app/admin/:path+",
       },
     ];
   },

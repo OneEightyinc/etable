@@ -46,7 +46,7 @@ export default function History() {
 
   const fetchHistory = useCallback(async () => {
     try {
-      const res = await fetch(`/api/queue/history?storeId=${encodeURIComponent(storeId)}`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_PATH || ""}/api/queue/history?storeId=${encodeURIComponent(storeId)}`, {
         credentials: "include",
       });
       const data = await res.json();
@@ -69,7 +69,7 @@ export default function History() {
 
   const handleRestore = async (id: string) => {
     try {
-      await fetch(`/api/queue/${encodeURIComponent(id)}`, {
+      await fetch(`${process.env.NEXT_PUBLIC_BASE_PATH || ""}/api/queue/${encodeURIComponent(id)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

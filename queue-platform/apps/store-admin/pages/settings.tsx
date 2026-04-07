@@ -89,7 +89,7 @@ export default function SettingsPage() {
   const [newClosedDay, setNewClosedDay] = useState('');
 
   useEffect(() => {
-    fetch(`/api/settings?storeId=${encodeURIComponent(storeId)}`, { credentials: "include" })
+    fetch(`${process.env.NEXT_PUBLIC_BASE_PATH || ""}/api/settings?storeId=${encodeURIComponent(storeId)}`, { credentials: "include" })
       .then(res => res.json())
       .then(data => {
         const s = data.settings;
@@ -135,7 +135,7 @@ export default function SettingsPage() {
       .map((m) => ({ name: m.name.trim(), price: m.price.trim() || '—' }));
 
     try {
-      const res = await fetch('/api/settings', {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_PATH || ""}/api/settings`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

@@ -15,7 +15,7 @@ const StoreAdminPage: NextPage = () => {
 
   const runAuthGate = useCallback(async () => {
     try {
-      const r = await fetch("/api/auth/me", { credentials: "include" });
+      const r = await fetch(`${process.env.NEXT_PUBLIC_BASE_PATH || ""}/api/auth/me`, { credentials: "include" });
       if (r.status === 401) {
         setPhase("login");
         return;
@@ -36,7 +36,7 @@ const StoreAdminPage: NextPage = () => {
       const raw = router.query.storeId;
       const urlStore = typeof raw === "string" && raw.trim() ? raw.trim() : "";
       if (urlStore && urlStore !== u.storeId) {
-        await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+        await fetch(`${process.env.NEXT_PUBLIC_BASE_PATH || ""}/api/auth/logout`, { method: "POST", credentials: "include" });
         setBannerError("このURLの店舗とログインできるアカウントが一致しません。発行された店舗用URLからログインしてください。");
         setPhase("login");
         return;
@@ -66,7 +66,7 @@ const StoreAdminPage: NextPage = () => {
 
   const handleLogout = async () => {
     try {
-      await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+      await fetch(`${process.env.NEXT_PUBLIC_BASE_PATH || ""}/api/auth/logout`, { method: "POST", credentials: "include" });
     } catch {
       /* ignore */
     }

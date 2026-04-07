@@ -68,7 +68,7 @@ const StoreView: React.FC<{ storeId?: string; onLogout?: () => void }> = ({
       return;
     }
     let cancelled = false;
-    fetch("/api/auth/me", { credentials: "include" })
+    fetch(`${process.env.NEXT_PUBLIC_BASE_PATH || ""}/api/auth/me`, { credentials: "include" })
       .then((r) => (r.ok ? r.json() : null))
       .then((data: { user?: { storeId?: string } } | null) => {
         if (cancelled) return;

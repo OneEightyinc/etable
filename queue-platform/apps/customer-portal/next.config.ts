@@ -6,15 +6,15 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/store/:path*",
-        destination: "https://store-admin-jade.vercel.app/:path*",
+        destination: "https://store-admin-jade.vercel.app/store/:path*",
       },
       {
         source: "/kiosk/:path*",
-        destination: "https://kiosk-eight-eta.vercel.app/:path*",
+        destination: "https://kiosk-eight-eta.vercel.app/kiosk/:path*",
       },
       {
         source: "/admin/:path*",
-        destination: "https://master-admin-xi.vercel.app/:path*",
+        destination: "https://master-admin-xi.vercel.app/admin/:path*",
       },
     ];
   },

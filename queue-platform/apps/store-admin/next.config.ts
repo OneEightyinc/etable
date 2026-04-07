@@ -4,6 +4,7 @@ import type { NextConfig } from "next";
 const monorepoRoot = path.join(__dirname, "..", "..");
 
 const nextConfig: NextConfig = {
+  basePath: process.env.VERCEL ? "/store" : "",
   assetPrefix: process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined,
   /**
    * 同一オリジンでは空のまま `/api/*` を使う（localhost:3020 や etable-1yex のルート配信）。

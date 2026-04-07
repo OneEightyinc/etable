@@ -6,7 +6,7 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/store/:path*",
-        destination: "https://store-admin-v2-rosy.vercel.app/:path*",
+        destination: "https://store-admin-jade.vercel.app/:path*",
       },
       {
         source: "/kiosk/:path*",

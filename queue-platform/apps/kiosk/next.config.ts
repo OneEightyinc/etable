@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  basePath: process.env.VERCEL ? "/kiosk" : "",
   /**
    * デプロイ先ホストごとに同一オリジンの静的アセットを参照する（古い固定 URL のままだと
    * 別プロジェクトの _next を読みに行き 404 になる）。

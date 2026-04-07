@@ -4,6 +4,7 @@ import type { NextConfig } from "next";
 const monorepoRoot = path.join(__dirname, "..", "..");
 
 const nextConfig: NextConfig = {
+  basePath: process.env.VERCEL ? "/admin" : "",
   assetPrefix: process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined,
   env: {
     // ローカルは空（/api/...）。本番でリバースプロキシのサブパス配下に置く場合のみ Vercel 等で NEXT_PUBLIC_API_PREFIX=/admin を設定

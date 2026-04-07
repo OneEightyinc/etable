@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useState } from "react";
-import Image from "next/image";
+
 
 type Props = {
   onStarted: () => void;
@@ -61,7 +61,7 @@ const ReceptionStartScreen: React.FC<Props> = ({ onStarted }) => {
   return (
     <div className="flex min-h-screen flex-col bg-white">
       <div className="header-logo flex justify-center px-6 pt-8 pb-4">
-        <Image src="/etable-logo-orange.svg" alt="ETABLE" width={180} height={40} className="h-10 w-auto" priority />
+        <img src={`${process.env.NEXT_PUBLIC_BASE_PATH || ""}/etable-logo-orange.svg`} alt="ETABLE" width={180} height={40} className="h-10 w-auto" />
       </div>
       <div className="flex flex-1 flex-col items-center justify-center px-6">
         <div className="mb-8 flex h-28 w-28 items-center justify-center rounded-full bg-[#FFF7ED]">

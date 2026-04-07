@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import Image from "next/image";
 
 type Props = {
   /** ログイン API 成功後（クッキー設定済み） */
@@ -46,13 +45,12 @@ const StoreLoginScreen: React.FC<Props> = ({ onLoginSuccess, storeIdHint, banner
   return (
     <div className="flex min-h-screen flex-col items-center bg-white px-6">
       <div className="flex w-full max-w-sm flex-1 flex-col items-start pt-[12.5rem]">
-        <Image
-          src="/etable-logo-orange.svg"
+        <img
+          src={`${process.env.NEXT_PUBLIC_BASE_PATH || ""}/etable-logo-orange.svg`}
           alt="ETABLE"
           width={200}
           height={44}
           className="mb-3 h-[44px] w-auto"
-          priority
         />
         <p
           className={`login-subtitle text-left text-[11px] font-black uppercase tracking-[0.35em] text-gray-300 ${storeIdHint ? "mb-2" : "mb-10"}`}

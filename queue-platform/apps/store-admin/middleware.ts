@@ -25,10 +25,11 @@ export async function middleware(request: NextRequest) {
   const destPath = rest.length === 0 ? "/" : `/${rest.join("/")}`;
 
   const origin = request.nextUrl.origin;
+  const basePath = process.env.VERCEL ? "/store" : "";
   let storeId: string;
   try {
     const res = await fetch(
-      `${origin}/api/resolve-public-token?kind=storeAdmin&token=${encodeURIComponent(token)}`,
+      `${origin}${basePath}/api/resolve-public-token?kind=storeAdmin&token=${encodeURIComponent(token)}`,
       { headers: { "x-from-middleware": "1" } }
     );
     if (!res.ok) {

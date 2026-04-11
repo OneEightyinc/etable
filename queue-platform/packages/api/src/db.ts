@@ -92,6 +92,7 @@ export interface CustomerProfileRecord {
   displayName: string;
   email: string;
   phone: string;
+  avatarUrl: string;
   totalPoints: number;
   currentTier: MemberTier;
   referralCode: string;
@@ -142,6 +143,56 @@ export const TIER_BENEFITS: Record<MemberTier, string[]> = {
   SILVER: ["ファストパス1回券"],
   GOLD: ["ファストパス月2回", "1ドリンク無料"],
 };
+
+/** メニューカテゴリ */
+export interface MenuCategory {
+  id: string;
+  storeId: string;
+  name: string;
+  sortOrder: number;
+}
+
+/** メニューアイテム */
+export interface MenuItem {
+  id: string;
+  storeId: string;
+  categoryId: string;
+  name: string;
+  price: number;
+  description: string;
+  imageUrl: string;
+  soldOut: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** 注文ステータス */
+export type OrderStatus = "ORDERED" | "PREPARING" | "SERVED" | "PAID" | "CANCELLED";
+
+/** 注文 */
+export interface Order {
+  id: string;
+  storeId: string;
+  tableLabel: string;        // テーブル番号 or 整理券番号
+  customerId?: string;
+  items: OrderItem[];
+  subtotal: number;
+  tax: number;
+  total: number;
+  status: OrderStatus;
+  paidAmount?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** 注文アイテム */
+export interface OrderItem {
+  menuItemId: string;
+  name: string;
+  price: number;
+  quantity: number;
+}
 
 /** 待機中ミニアンケート */
 export interface WaitingSurveyRecord {
@@ -223,6 +274,9 @@ interface Database {
   pointHistory: PointHistoryRecord[];
   waitingSurveys: WaitingSurveyRecord[];
   postVisitReviews: PostVisitReviewRecord[];
+  menuCategories: MenuCategory[];
+  menuItems: MenuItem[];
+  orders: Order[];
 }
 
 const REMOTE_DB_KEY = "queue-platform:database:v1";
@@ -353,6 +407,9 @@ function getDefaultDb(): Database {
     pointHistory: [],
     waitingSurveys: [],
     postVisitReviews: [],
+    menuCategories: [],
+    menuItems: [],
+    orders: [],
   };
 }
 
@@ -379,6 +436,9 @@ function normalizeDatabase(raw: unknown): Database {
     pointHistory: Array.isArray(d.pointHistory) ? (d.pointHistory as PointHistoryRecord[]) : [],
     waitingSurveys: Array.isArray(d.waitingSurveys) ? (d.waitingSurveys as WaitingSurveyRecord[]) : [],
     postVisitReviews: Array.isArray(d.postVisitReviews) ? (d.postVisitReviews as PostVisitReviewRecord[]) : [],
+    menuCategories: Array.isArray(d.menuCategories) ? (d.menuCategories as MenuCategory[]) : [],
+    menuItems: Array.isArray(d.menuItems) ? (d.menuItems as MenuItem[]) : [],
+    orders: Array.isArray(d.orders) ? (d.orders as Order[]) : [],
   };
 }
 
@@ -966,7 +1026,29 @@ export async function updateStoreSettings(
 export async function getCustomerProfileById(id: string): Promise<CustomerProfileRecord | undefined> {
   const db = await readDatabase();
   if (!db.customerProfiles) db.customerProfiles = [];
-  return db.customerProfiles.find((c) => c.id === id);
+  const profile = db.customerProfiles.find((c) => c.id === id);
+  if (profile) {
+    // 既存プロフィールに新フィールドがない場合は自動補完
+    let changed = false;
+    if (!profile.referralCode) {
+      profile.referralCode = crypto.randomBytes(4).toString("hex").toUpperCase();
+      changed = true;
+    }
+    if (profile.totalPoints === undefined) {
+      profile.totalPoints = 0;
+      changed = true;
+    }
+    if (!profile.currentTier) {
+      profile.currentTier = calculateTier(profile.totalPoints);
+      changed = true;
+    }
+    if (profile.avatarUrl === undefined) {
+      profile.avatarUrl = "";
+      changed = true;
+    }
+    if (changed) await persistDatabase();
+  }
+  return profile;
 }
 
 export async function createCustomerProfile(data: {
@@ -982,6 +1064,7 @@ export async function createCustomerProfile(data: {
     displayName: data.displayName.trim(),
     email: (data.email ?? "").trim(),
     phone: (data.phone ?? "").trim(),
+    avatarUrl: "",
     totalPoints: 0,
     currentTier: "BRONZE",
     referralCode: crypto.randomBytes(4).toString("hex").toUpperCase(),
@@ -995,7 +1078,7 @@ export async function createCustomerProfile(data: {
 
 export async function updateCustomerProfile(
   id: string,
-  data: Partial<{ displayName: string; email: string; phone: string }>
+  data: Partial<{ displayName: string; email: string; phone: string; avatarUrl: string }>
 ): Promise<CustomerProfileRecord> {
   const db = await readDatabase();
   if (!db.customerProfiles) db.customerProfiles = [];
@@ -1005,6 +1088,7 @@ export async function updateCustomerProfile(
   if (data.displayName !== undefined) row.displayName = data.displayName.trim();
   if (data.email !== undefined) row.email = data.email.trim();
   if (data.phone !== undefined) row.phone = data.phone.trim();
+  if (data.avatarUrl !== undefined) row.avatarUrl = data.avatarUrl;
   row.updatedAt = new Date().toISOString();
   await persistDatabase();
   return row;
@@ -1067,6 +1151,169 @@ export async function getPointHistory(customerId: string): Promise<PointHistoryR
 export async function findCustomerByReferralCode(code: string): Promise<CustomerProfileRecord | undefined> {
   const db = await readDatabase();
   return (db.customerProfiles ?? []).find((c) => c.referralCode === code.toUpperCase());
+}
+
+// ─── Menu ───────────────────────────────────────────────
+
+export async function getMenuCategories(storeId: string): Promise<MenuCategory[]> {
+  const db = await readDatabase();
+  return (db.menuCategories ?? []).filter((c) => c.storeId === storeId).sort((a, b) => a.sortOrder - b.sortOrder);
+}
+
+export async function upsertMenuCategory(data: { id?: string; storeId: string; name: string; sortOrder?: number }): Promise<MenuCategory> {
+  const db = await readDatabase();
+  if (!db.menuCategories) db.menuCategories = [];
+  if (data.id) {
+    const idx = db.menuCategories.findIndex((c) => c.id === data.id);
+    if (idx >= 0) {
+      db.menuCategories[idx].name = data.name;
+      if (data.sortOrder !== undefined) db.menuCategories[idx].sortOrder = data.sortOrder;
+      await persistDatabase();
+      return db.menuCategories[idx];
+    }
+  }
+  const cat: MenuCategory = {
+    id: crypto.randomUUID(),
+    storeId: data.storeId,
+    name: data.name,
+    sortOrder: data.sortOrder ?? db.menuCategories.filter((c) => c.storeId === data.storeId).length,
+  };
+  db.menuCategories.push(cat);
+  await persistDatabase();
+  return cat;
+}
+
+export async function deleteMenuCategory(id: string): Promise<void> {
+  const db = await readDatabase();
+  db.menuCategories = (db.menuCategories ?? []).filter((c) => c.id !== id);
+  await persistDatabase();
+}
+
+export async function getMenuItems(storeId: string): Promise<MenuItem[]> {
+  const db = await readDatabase();
+  return (db.menuItems ?? []).filter((m) => m.storeId === storeId).sort((a, b) => a.sortOrder - b.sortOrder);
+}
+
+export async function upsertMenuItem(data: Partial<MenuItem> & { storeId: string; name: string; price: number; categoryId: string }): Promise<MenuItem> {
+  const db = await readDatabase();
+  if (!db.menuItems) db.menuItems = [];
+  const now = new Date().toISOString();
+  if (data.id) {
+    const idx = db.menuItems.findIndex((m) => m.id === data.id);
+    if (idx >= 0) {
+      const m = db.menuItems[idx];
+      m.name = data.name;
+      m.price = data.price;
+      m.categoryId = data.categoryId;
+      if (data.description !== undefined) m.description = data.description;
+      if (data.imageUrl !== undefined) m.imageUrl = data.imageUrl;
+      if (data.soldOut !== undefined) m.soldOut = data.soldOut;
+      if (data.sortOrder !== undefined) m.sortOrder = data.sortOrder;
+      m.updatedAt = now;
+      await persistDatabase();
+      return m;
+    }
+  }
+  const item: MenuItem = {
+    id: crypto.randomUUID(),
+    storeId: data.storeId,
+    categoryId: data.categoryId,
+    name: data.name,
+    price: data.price,
+    description: data.description ?? "",
+    imageUrl: data.imageUrl ?? "",
+    soldOut: data.soldOut ?? false,
+    sortOrder: data.sortOrder ?? db.menuItems.filter((m) => m.storeId === data.storeId).length,
+    createdAt: now,
+    updatedAt: now,
+  };
+  db.menuItems.push(item);
+  await persistDatabase();
+  return item;
+}
+
+export async function deleteMenuItem(id: string): Promise<void> {
+  const db = await readDatabase();
+  db.menuItems = (db.menuItems ?? []).filter((m) => m.id !== id);
+  await persistDatabase();
+}
+
+// ─── Orders ─────────────────────────────────────────────
+
+const TAX_RATE = 0.10;
+
+export async function createOrder(data: {
+  storeId: string;
+  tableLabel: string;
+  customerId?: string;
+  items: { menuItemId: string; name: string; price: number; quantity: number }[];
+}): Promise<Order> {
+  const db = await readDatabase();
+  if (!db.orders) db.orders = [];
+  const subtotal = data.items.reduce((sum, i) => sum + i.price * i.quantity, 0);
+  const tax = Math.floor(subtotal * TAX_RATE);
+  const now = new Date().toISOString();
+  const order: Order = {
+    id: crypto.randomUUID(),
+    storeId: data.storeId,
+    tableLabel: data.tableLabel,
+    customerId: data.customerId,
+    items: data.items,
+    subtotal,
+    tax,
+    total: subtotal + tax,
+    status: "ORDERED",
+    createdAt: now,
+    updatedAt: now,
+  };
+  db.orders.push(order);
+  await persistDatabase();
+  return order;
+}
+
+export async function addItemsToOrder(orderId: string, items: OrderItem[]): Promise<Order> {
+  const db = await readDatabase();
+  const order = (db.orders ?? []).find((o) => o.id === orderId);
+  if (!order) throw new Error("注文が見つかりません");
+  for (const newItem of items) {
+    const existing = order.items.find((i) => i.menuItemId === newItem.menuItemId);
+    if (existing) {
+      existing.quantity += newItem.quantity;
+    } else {
+      order.items.push(newItem);
+    }
+  }
+  order.subtotal = order.items.reduce((sum, i) => sum + i.price * i.quantity, 0);
+  order.tax = Math.floor(order.subtotal * TAX_RATE);
+  order.total = order.subtotal + order.tax;
+  order.updatedAt = new Date().toISOString();
+  await persistDatabase();
+  return order;
+}
+
+export async function updateOrderStatus(orderId: string, status: OrderStatus, paidAmount?: number): Promise<Order> {
+  const db = await readDatabase();
+  const order = (db.orders ?? []).find((o) => o.id === orderId);
+  if (!order) throw new Error("注文が見つかりません");
+  order.status = status;
+  if (paidAmount !== undefined) order.paidAmount = paidAmount;
+  order.updatedAt = new Date().toISOString();
+  await persistDatabase();
+  return order;
+}
+
+export async function getOrdersByStore(storeId: string, date?: string): Promise<Order[]> {
+  const db = await readDatabase();
+  let orders = (db.orders ?? []).filter((o) => o.storeId === storeId);
+  if (date) {
+    orders = orders.filter((o) => o.createdAt.startsWith(date));
+  }
+  return orders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+}
+
+export async function getOrderById(id: string): Promise<Order | undefined> {
+  const db = await readDatabase();
+  return (db.orders ?? []).find((o) => o.id === id);
 }
 
 // ─── Waiting Survey ─────────────────────────────────────

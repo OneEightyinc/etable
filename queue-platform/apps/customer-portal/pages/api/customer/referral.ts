@@ -3,6 +3,7 @@ import {
   getCustomerProfileById,
   findCustomerByReferralCode,
   addPoints,
+  getPointHistory,
   getCustomerIdFromRequest,
 } from "@queue-platform/api/src/server";
 
@@ -29,6 +30,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // 自分の招待コードは使えない
     if (customer.referralCode === referralCode.toUpperCase()) {
       return res.status(400).json({ success: false, message: "自分の招待コードは使用できません" });
+    }
+
+    // 既に招待済みかチェック（1ユーザーにつき招待特典は1回まで）
+    const history = await getPointHistory(customerId);
+    if (history.some((h) => h.action === "REFERRAL_RECEIVED")) {
+      return res.status(400).json({ success: false, message: "招待特典は1回のみ利用できます" });
     }
 
     const referrer = await findCustomerByReferralCode(referralCode);

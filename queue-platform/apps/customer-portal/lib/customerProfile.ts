@@ -5,6 +5,7 @@ export type CustomerProfile = {
   displayName: string;
   email: string;
   phone: string;
+  avatarUrl?: string;
   registeredAt: string;
 };
 
@@ -30,6 +31,7 @@ export async function saveCustomerProfileToServer(data: {
   displayName: string;
   email?: string;
   phone?: string;
+  avatarUrl?: string;
 }): Promise<CustomerProfile> {
   const res = await fetch("/api/customer/save", {
     method: "POST",
@@ -39,6 +41,7 @@ export async function saveCustomerProfileToServer(data: {
       displayName: data.displayName.trim(),
       email: data.email?.trim() ?? "",
       phone: data.phone?.trim() ?? "",
+      ...(data.avatarUrl !== undefined ? { avatarUrl: data.avatarUrl } : {}),
     }),
   });
   if (!res.ok) throw new Error(await readError(res));

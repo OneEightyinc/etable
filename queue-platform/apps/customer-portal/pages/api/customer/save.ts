@@ -7,17 +7,17 @@ import {
   setCustomerCookie,
 } from "@queue-platform/api/src/server";
 
-function parseBody(req: NextApiRequest): { displayName?: string; email?: string; phone?: string } {
+function parseBody(req: NextApiRequest): { displayName?: string; email?: string; phone?: string; avatarUrl?: string } {
   const b = req.body;
   if (b == null) return {};
   if (typeof b === "string") {
     try {
-      return JSON.parse(b) as { displayName?: string; email?: string; phone?: string };
+      return JSON.parse(b) as { displayName?: string; email?: string; phone?: string; avatarUrl?: string };
     } catch {
       return {};
     }
   }
-  if (typeof b === "object") return b as { displayName?: string; email?: string; phone?: string };
+  if (typeof b === "object") return b as { displayName?: string; email?: string; phone?: string; avatarUrl?: string };
   return {};
 }
 
@@ -28,7 +28,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const { displayName, email, phone } = parseBody(req);
+    const { displayName, email, phone, avatarUrl } = parseBody(req);
     if (!displayName || typeof displayName !== "string" || !displayName.trim()) {
       return res.status(400).json({ error: "displayName is required" });
     }
@@ -41,6 +41,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           displayName,
           email: typeof email === "string" ? email : undefined,
           phone: typeof phone === "string" ? phone : undefined,
+          avatarUrl: typeof avatarUrl === "string" ? avatarUrl : undefined,
         });
         setCustomerCookie(res, updated.id);
         return res.status(200).json({
@@ -49,6 +50,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             displayName: updated.displayName,
             email: updated.email,
             phone: updated.phone,
+            avatarUrl: updated.avatarUrl ?? "",
             totalPoints: updated.totalPoints ?? 0,
             currentTier: updated.currentTier ?? "BRONZE",
             referralCode: updated.referralCode ?? "",
@@ -70,6 +72,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         displayName: row.displayName,
         email: row.email,
         phone: row.phone,
+        avatarUrl: row.avatarUrl ?? "",
         totalPoints: row.totalPoints ?? 0,
         currentTier: row.currentTier ?? "BRONZE",
         referralCode: row.referralCode ?? "",

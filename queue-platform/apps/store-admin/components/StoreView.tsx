@@ -641,6 +641,14 @@ const StoreView: React.FC<{ storeId?: string; onLogout?: () => void }> = ({
               <div className="mb-6">
                 <p className="text-xs text-gray-400 tracking-widest mb-3">MENU</p>
                 <div className="space-y-2">
+                  <Link href={storeScopedPath(publicToken, "/menu", storeId)} className="w-full flex items-center gap-3 px-4 py-3.5 bg-[#FD780F] text-white rounded-xl hover:bg-[#e46a0a] transition-colors">
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M3 12h18M3 18h18" /></svg>
+                    <span className="font-medium">メニュー管理</span>
+                  </Link>
+                  <Link href={storeScopedPath(publicToken, "/orders", storeId)} className="w-full flex items-center gap-3 px-4 py-3.5 bg-[#FD780F]/10 text-[#FD780F] border-2 border-[#FD780F] rounded-xl hover:bg-[#FD780F]/20 transition-colors">
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" /><rect x="9" y="3" width="6" height="4" rx="1" /><path d="M9 14l2 2 4-4" /></svg>
+                    <span className="font-medium">注文・会計</span>
+                  </Link>
                   <Link href={storeScopedPath(publicToken, "/history", storeId)} className="w-full flex items-center gap-3 px-4 py-3.5 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
                     <svg className="w-5 h-5 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
                     <span className="font-medium text-[#082752]">案内・キャンセル履歴</span>

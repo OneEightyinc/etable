@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/router";
@@ -77,6 +77,9 @@ const MyPage: React.FC = () => {
   const [pointHistory, setPointHistory] = useState<{ id: string; action: string; points: number; description: string; createdAt: string }[]>([]);
   const [referralInput, setReferralInput] = useState("");
   const [referralMsg, setReferralMsg] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   const refreshLists = useCallback(() => setListVersion((v) => v + 1), []);
 
@@ -141,6 +144,7 @@ const MyPage: React.FC = () => {
           setDisplayName(p.displayName);
           setEmail(p.email);
           setPhone(p.phone);
+          setAvatarUrl(p.avatarUrl ?? "");
         }
       } catch (e) {
         if (!cancelled) {
@@ -269,6 +273,50 @@ const MyPage: React.FC = () => {
     }
   };
 
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !profile) return;
+    setAvatarUploading(true);
+    try {
+      // 画像をリサイズしてBase64に変換（最大200x200）
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const img = document.createElement("img");
+          img.onload = () => {
+            const canvas = document.createElement("canvas");
+            const size = 200;
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext("2d")!;
+            const min = Math.min(img.width, img.height);
+            const sx = (img.width - min) / 2;
+            const sy = (img.height - min) / 2;
+            ctx.drawImage(img, sx, sy, min, min, 0, 0, size, size);
+            resolve(canvas.toDataURL("image/jpeg", 0.8));
+          };
+          img.onerror = reject;
+          img.src = reader.result as string;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const p = await saveCustomerProfileToServer({
+        displayName: profile.displayName,
+        email: profile.email,
+        phone: profile.phone,
+        avatarUrl: dataUrl,
+      } as any);
+      setProfile(p);
+      setAvatarUrl(dataUrl);
+    } catch (err) {
+      setProfileError(err instanceof Error ? err.message : "画像の保存に失敗しました");
+    } finally {
+      setAvatarUploading(false);
+      if (avatarInputRef.current) avatarInputRef.current.value = "";
+    }
+  };
+
   const openEdit = () => {
     setEditing(true);
     void router.replace({ pathname: "/mypage", query: { edit: "1" } }, "/mypage?edit=1", { shallow: true });
@@ -389,9 +437,33 @@ const MyPage: React.FC = () => {
               <section className="mb-4">
                 <div className="flex items-center gap-4 rounded-[20px] border border-[#eee] bg-white p-4 shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
                   <div className="relative shrink-0">
-                    <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#fff5ef] text-[22px] font-bold text-[#ff6b00]">
-                      {memberAvatarInitial(profile.displayName)}
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => avatarInputRef.current?.click()}
+                      className="group relative flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-[#fff5ef]"
+                      disabled={avatarUploading}
+                    >
+                      {avatarUrl ? (
+                        <Image src={avatarUrl} alt="" fill className="object-cover" sizes="56px" unoptimized />
+                      ) : (
+                        <span className="text-[22px] font-bold text-[#ff6b00]">
+                          {memberAvatarInitial(profile.displayName)}
+                        </span>
+                      )}
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/30">
+                        <svg className="h-5 w-5 text-white opacity-0 transition-opacity group-hover:opacity-100" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" />
+                          <circle cx="12" cy="13" r="4" />
+                        </svg>
+                      </div>
+                    </button>
+                    <input
+                      ref={avatarInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleAvatarChange}
+                    />
                     <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white bg-[#22c55e]" />
                   </div>
                   <div className="min-w-0 flex-1">
@@ -408,20 +480,26 @@ const MyPage: React.FC = () => {
 
               <section className="mb-4">
                 <div className="relative overflow-hidden rounded-[20px] bg-gradient-to-br from-[#ff6b00] to-[#ff8c42] p-5 text-white shadow-[0_8px_24px_rgba(255,107,0,0.3)]">
-                  <p className="text-[10px] font-bold tracking-wider opacity-90">MEMBERSHIP CARD</p>
-                  <p className="mt-1 text-[18px] font-bold">ETABLE PASS</p>
-                  {tierBenefit(currentTier) && (
-                    <span className="absolute right-4 top-4 max-w-[200px] rounded-full bg-[#ff8c42] px-2.5 py-1 text-center text-[10px] font-bold leading-tight">
-                      {tierBenefit(currentTier)}
-                    </span>
-                  )}
-                  <button
-                    type="button"
-                    onClick={openEdit}
-                    className="absolute left-4 top-[52px] text-[11px] font-bold text-white/90 underline"
-                  >
-                    編集
-                  </button>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-[10px] font-bold tracking-wider opacity-90">MEMBERSHIP CARD</p>
+                      <p className="mt-1 text-[18px] font-bold">ETABLE PASS</p>
+                    </div>
+                    <div className="flex flex-col items-end gap-1">
+                      {tierBenefit(currentTier) && (
+                        <span className="rounded-full bg-[#ff8c42] px-2.5 py-1 text-center text-[10px] font-bold leading-tight">
+                          {tierBenefit(currentTier)}
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={openEdit}
+                        className="text-[11px] font-bold text-white/90 underline"
+                      >
+                        編集
+                      </button>
+                    </div>
+                  </div>
                   <div className="mt-4 flex items-end justify-between">
                     <div>
                       <p className="text-[10px] opacity-90">AVAILABLE POINTS</p>

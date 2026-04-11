@@ -35,8 +35,16 @@ interface OrderResponse {
   };
 }
 
+interface OrderHistoryItem {
+  id: string;
+  items: CartItem[];
+  total: number;
+  status: string;
+  createdAt: string;
+}
+
 /* ─── Screens ─── */
-type Screen = "menu" | "confirm" | "success";
+type Screen = "menu" | "confirm" | "success" | "history";
 
 /* ─── Component ─── */
 const OrderPage: React.FC = () => {
@@ -56,6 +64,7 @@ const OrderPage: React.FC = () => {
   const [orderId, setOrderId] = useState<string | null>(null);
   const [lastOrderItems, setLastOrderItems] = useState<CartItem[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [orderHistory, setOrderHistory] = useState<OrderHistoryItem[]>([]);
 
   /* ─── Fetch store info ─── */
   useEffect(() => {
@@ -115,6 +124,27 @@ const OrderPage: React.FC = () => {
     selectedCategory === "all"
       ? items
       : items.filter((i) => i.categoryId === selectedCategory);
+
+  /* ─── Fetch order history ─── */
+  async function fetchHistory() {
+    if (!storeId) return;
+    try {
+      const q = tableLabel ? `&table=${encodeURIComponent(tableLabel)}` : "";
+      const res = await fetch(`/api/order?storeId=${encodeURIComponent(storeId)}${q}`);
+      if (res.ok) {
+        const data = await res.json();
+        setOrderHistory(
+          (data.orders ?? []).map((o: any) => ({
+            id: o.id,
+            items: o.items ?? [],
+            total: o.total ?? 0,
+            status: o.status ?? "",
+            createdAt: o.createdAt ?? "",
+          }))
+        );
+      }
+    } catch {}
+  }
 
   /* ─── Submit order ─── */
   async function submitOrder() {
@@ -270,10 +300,94 @@ const OrderPage: React.FC = () => {
 
         <button
           onClick={() => setScreen("menu")}
-          className="w-full rounded-xl border-2 border-[#ff6b00] py-4 text-lg font-bold text-[#ff6b00] active:bg-orange-50"
+          className="mb-3 w-full rounded-xl border-2 border-[#ff6b00] py-4 text-lg font-bold text-[#ff6b00] active:bg-orange-50"
         >
           追加注文する
         </button>
+        <button
+          onClick={() => { void fetchHistory(); setScreen("history"); }}
+          className="w-full rounded-xl bg-gray-100 py-3 text-sm font-bold text-gray-600 active:bg-gray-200"
+        >
+          注文履歴を見る
+        </button>
+      </div>
+    );
+  }
+
+  /* ─── History screen ─── */
+  if (screen === "history") {
+    const statusLabel: Record<string, string> = {
+      ORDERED: "注文済み",
+      PREPARING: "準備中",
+      SERVED: "提供済み",
+      PAID: "会計済み",
+      CANCELLED: "キャンセル",
+    };
+    const statusColor: Record<string, string> = {
+      ORDERED: "bg-[#ff6b00] text-white",
+      PREPARING: "bg-yellow-400 text-white",
+      SERVED: "bg-green-500 text-white",
+      PAID: "bg-gray-400 text-white",
+      CANCELLED: "bg-red-400 text-white",
+    };
+    return (
+      <div className="mx-auto min-h-screen max-w-[430px] bg-gray-50">
+        {/* Header */}
+        <header className="sticky top-0 z-20 flex items-center justify-between border-b bg-white px-4 py-3">
+          <button onClick={() => setScreen("menu")} className="text-sm font-bold text-[#ff6b00]">
+            ← メニューに戻る
+          </button>
+          <h1 className="text-base font-bold text-gray-900">注文履歴</h1>
+          <div className="w-16" />
+        </header>
+
+        <div className="p-4 space-y-3">
+          {tableLabel && (
+            <p className="text-center text-sm text-gray-500">テーブル {tableLabel} の本日の注文</p>
+          )}
+
+          {orderHistory.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+              <svg className="mb-3 h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" />
+                <rect x="9" y="3" width="6" height="4" rx="1" />
+              </svg>
+              <p className="font-bold">注文履歴がありません</p>
+            </div>
+          ) : (
+            orderHistory.map((order) => (
+              <div key={order.id} className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                <div className="mb-3 flex items-center justify-between">
+                  <span className="text-xs text-gray-400">
+                    {new Date(order.createdAt).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })}
+                  </span>
+                  <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${statusColor[order.status] ?? "bg-gray-200 text-gray-600"}`}>
+                    {statusLabel[order.status] ?? order.status}
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  {order.items.map((item, i) => (
+                    <div key={i} className="flex justify-between text-sm">
+                      <span className="text-gray-700">{item.name} × {item.quantity}</span>
+                      <span className="text-gray-500">¥{(item.price * item.quantity).toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-2 flex justify-between border-t pt-2 text-sm font-bold">
+                  <span>合計（税込）</span>
+                  <span className="text-[#ff6b00]">¥{order.total.toLocaleString()}</span>
+                </div>
+              </div>
+            ))
+          )}
+
+          <button
+            onClick={() => setScreen("menu")}
+            className="mt-4 w-full rounded-xl bg-[#ff6b00] py-4 text-center text-base font-bold text-white active:bg-[#e46a0a]"
+          >
+            追加注文する
+          </button>
+        </div>
       </div>
     );
   }
@@ -283,14 +397,23 @@ const OrderPage: React.FC = () => {
     <div className="mx-auto flex min-h-screen max-w-[430px] flex-col bg-gray-50">
       {/* ─ Top bar ─ */}
       <div className="sticky top-0 z-20 bg-white shadow-sm">
-        {/* Logo + store info */}
-        <div className="flex items-center gap-3 px-4 pt-4 pb-2">
-          {/* ETABLE logo */}
+        {/* Logo + store info + history button */}
+        <div className="flex items-center justify-between px-4 pt-4 pb-2">
           <div className="flex h-9 items-center">
             <span className="text-xl font-extrabold tracking-tight text-[#ff6b00]">
               ETABLE
             </span>
           </div>
+          <button
+            onClick={() => { void fetchHistory(); setScreen("history"); }}
+            className="flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1.5 text-xs font-bold text-gray-600 active:bg-gray-200"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" />
+              <rect x="9" y="3" width="6" height="4" rx="1" />
+            </svg>
+            注文履歴
+          </button>
         </div>
 
         {/* Store name + table */}

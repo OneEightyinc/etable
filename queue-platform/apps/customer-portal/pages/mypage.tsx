@@ -32,12 +32,14 @@ import {
   formatMemberDisplayId,
   memberAvatarInitial,
   formatMemberNameLine,
-  tierFromMonthlyVisits,
   tierLabel,
   tierBenefit,
-  displayPointsFromVisits,
+  tierBenefitList,
   pointsProgress,
+  nextTierLabel,
+  pointActionLabel,
   countVisitsThisMonth,
+  type MemberTier,
 } from "../lib/memberDisplay";
 
 function loadWaitingReservations(): ReservationItem[] {
@@ -69,6 +71,12 @@ const MyPage: React.FC = () => {
   const [visitCards, setVisitCards] = useState<
     { id: string; name: string; isoDate: string; imageUrl: string }[]
   >([]);
+  const [totalPoints, setTotalPoints] = useState(0);
+  const [currentTier, setCurrentTier] = useState<MemberTier>("BRONZE");
+  const [referralCode, setReferralCode] = useState("");
+  const [pointHistory, setPointHistory] = useState<{ id: string; action: string; points: number; description: string; createdAt: string }[]>([]);
+  const [referralInput, setReferralInput] = useState("");
+  const [referralMsg, setReferralMsg] = useState("");
 
   const refreshLists = useCallback(() => setListVersion((v) => v + 1), []);
 
@@ -196,11 +204,28 @@ const MyPage: React.FC = () => {
     };
   }, [profile, recentVisits]);
 
+  // ポイントデータをサーバーから取得
+  useEffect(() => {
+    if (!profile) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/customer/points?customerId=${profile.id}`, { credentials: "include" });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+        setTotalPoints(data.totalPoints ?? 0);
+        setCurrentTier(data.currentTier ?? "BRONZE");
+        setReferralCode(data.referralCode ?? "");
+        setPointHistory(data.history ?? []);
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+  }, [profile, listVersion]);
+
   const visitDates = getReservations().map((r) => r.createdAt);
   const monthlyVisits = countVisitsThisMonth(visitDates);
-  const tier = tierFromMonthlyVisits(monthlyVisits);
-  const points = displayPointsFromVisits(monthlyVisits);
-  const progress = pointsProgress(points, tier);
+  const progress = pointsProgress(totalPoints, currentTier);
 
   const waitingReservations = useMemo(() => loadWaitingReservations(), [listVersion, profile]);
 
@@ -371,8 +396,10 @@ const MyPage: React.FC = () => {
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-[18px] font-bold text-[#111]">{formatMemberNameLine(profile.displayName)}</p>
-                    <span className="mt-1 inline-block rounded-md bg-[#e5e5e5] px-2 py-0.5 text-[12px] font-bold text-white">
-                      {tierLabel(tier)}
+                    <span className={`mt-1 inline-block rounded-md px-2 py-0.5 text-[12px] font-bold text-white ${
+                      currentTier === "GOLD" ? "bg-[#D4A017]" : currentTier === "SILVER" ? "bg-[#9CA3AF]" : "bg-[#CD7F32]"
+                    }`}>
+                      {tierLabel(currentTier)}
                     </span>
                     <p className="mt-1.5 text-[12px] text-[#999]">ID: {formatMemberDisplayId(profile.id)}</p>
                   </div>
@@ -383,9 +410,11 @@ const MyPage: React.FC = () => {
                 <div className="relative overflow-hidden rounded-[20px] bg-gradient-to-br from-[#ff6b00] to-[#ff8c42] p-5 text-white shadow-[0_8px_24px_rgba(255,107,0,0.3)]">
                   <p className="text-[10px] font-bold tracking-wider opacity-90">MEMBERSHIP CARD</p>
                   <p className="mt-1 text-[18px] font-bold">ETABLE PASS</p>
-                  <span className="absolute right-4 top-4 max-w-[200px] rounded-full bg-[#ff8c42] px-2.5 py-1 text-center text-[10px] font-bold leading-tight">
-                    RANK BENEFIT {tierBenefit(tier)}
-                  </span>
+                  {tierBenefit(currentTier) && (
+                    <span className="absolute right-4 top-4 max-w-[200px] rounded-full bg-[#ff8c42] px-2.5 py-1 text-center text-[10px] font-bold leading-tight">
+                      {tierBenefit(currentTier)}
+                    </span>
+                  )}
                   <button
                     type="button"
                     onClick={openEdit}
@@ -397,18 +426,28 @@ const MyPage: React.FC = () => {
                     <div>
                       <p className="text-[10px] opacity-90">AVAILABLE POINTS</p>
                       <p className="text-[32px] font-bold tracking-tight">
-                        {points.toLocaleString()}
+                        {totalPoints.toLocaleString()}
                         <span className="ml-1 text-[14px] font-medium">pts</span>
                       </p>
                     </div>
-                    <div className="text-right">
-                      <p className="text-[10px] opacity-90">Next Goal</p>
-                      <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-[#ff8c42] px-3 py-1.5 text-[12px] font-bold">
-                        あと {progress.remaining}pt で{progress.nextLabel}
-                        <ChevronRightIcon className="h-4 w-4" />
-                      </span>
-                    </div>
+                    {progress.nextLabel && (
+                      <div className="text-right">
+                        <p className="text-[10px] opacity-90">Next Goal</p>
+                        <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-[#ff8c42] px-3 py-1.5 text-[12px] font-bold">
+                          あと {progress.remaining}pt で{progress.nextLabel}
+                          <ChevronRightIcon className="h-4 w-4" />
+                        </span>
+                      </div>
+                    )}
                   </div>
+                  {/* プログレスバー */}
+                  {progress.nextLabel && (
+                    <div className="mt-3">
+                      <div className="h-2 w-full overflow-hidden rounded-full bg-white/30">
+                        <div className="h-full rounded-full bg-white transition-all" style={{ width: `${progress.percent}%` }} />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </section>
 
@@ -425,6 +464,111 @@ const MyPage: React.FC = () => {
                   </div>
                 </div>
               </section>
+
+              {/* ランク特典 */}
+              {tierBenefitList(currentTier).length > 0 && (
+                <section className="mb-6">
+                  <h2 className="mb-3 text-[16px] font-bold text-[#111]">現在の特典</h2>
+                  <div className="space-y-2">
+                    {tierBenefitList(currentTier).map((b, i) => (
+                      <div key={i} className="flex items-center gap-3 rounded-[16px] border border-[#eee] bg-white p-4 shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#fff5ef]">
+                          <TicketIcon className="h-5 w-5 text-[#ff6b00]" />
+                        </div>
+                        <span className="text-[14px] font-bold text-[#111]">{b}</span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {/* 友達招待 */}
+              <section className="mb-6">
+                <h2 className="mb-3 text-[16px] font-bold text-[#111]">友達招待</h2>
+                <div className="rounded-[16px] border border-[#eee] bg-white p-4 shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
+                  <p className="mb-2 text-[12px] text-[#666]">あなたの招待コード</p>
+                  <div className="mb-4 flex items-center gap-2">
+                    <span className="rounded-lg bg-[#f5f5f7] px-4 py-2 text-[18px] font-bold tracking-widest text-[#082752]">
+                      {referralCode || "---"}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (referralCode) {
+                          navigator.clipboard?.writeText(referralCode);
+                          setReferralMsg("コピーしました");
+                          setTimeout(() => setReferralMsg(""), 2000);
+                        }
+                      }}
+                      className="rounded-lg bg-[#ff6b00] px-3 py-2 text-[12px] font-bold text-white"
+                    >
+                      コピー
+                    </button>
+                  </div>
+                  <p className="mb-2 text-[12px] text-[#666]">招待コードを入力</p>
+                  <div className="flex gap-2">
+                    <input
+                      value={referralInput}
+                      onChange={(e) => setReferralInput(e.target.value.toUpperCase())}
+                      className="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-[14px] uppercase tracking-widest outline-none focus:border-[#ff6b00]"
+                      placeholder="招待コード"
+                      maxLength={8}
+                    />
+                    <button
+                      type="button"
+                      disabled={referralInput.length < 4}
+                      onClick={async () => {
+                        try {
+                          const res = await fetch("/api/customer/referral", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            credentials: "include",
+                            body: JSON.stringify({ customerId: profile!.id, referralCode: referralInput }),
+                          });
+                          const data = await res.json();
+                          setReferralMsg(data.message || (data.success ? "適用しました" : "エラー"));
+                          if (data.success) {
+                            setReferralInput("");
+                            refreshLists();
+                          }
+                        } catch {
+                          setReferralMsg("通信エラー");
+                        }
+                        setTimeout(() => setReferralMsg(""), 3000);
+                      }}
+                      className="rounded-xl bg-[#082752] px-4 py-2 text-[12px] font-bold text-white disabled:opacity-40"
+                    >
+                      適用
+                    </button>
+                  </div>
+                  {referralMsg && (
+                    <p className="mt-2 text-[12px] font-bold text-[#ff6b00]">{referralMsg}</p>
+                  )}
+                  <p className="mt-3 text-[11px] text-[#999]">招待すると双方に150ptプレゼント！</p>
+                </div>
+              </section>
+
+              {/* ポイント履歴 */}
+              {pointHistory.length > 0 && (
+                <section className="mb-6">
+                  <h2 className="mb-3 text-[16px] font-bold text-[#111]">ポイント履歴</h2>
+                  <div className="overflow-hidden rounded-[16px] border border-[#eee] bg-white">
+                    {pointHistory.slice(0, 5).map((h) => (
+                      <div key={h.id} className="flex items-center justify-between border-b border-[#f0f0f0] px-4 py-3 last:border-b-0">
+                        <div>
+                          <p className="text-[13px] font-medium text-[#333]">{h.description}</p>
+                          <p className="text-[11px] text-[#999]">
+                            {new Date(h.createdAt).toLocaleDateString("ja-JP")}
+                          </p>
+                        </div>
+                        <span className={`text-[14px] font-bold ${h.points >= 0 ? "text-[#22c55e]" : "text-[#ef4444]"}`}>
+                          {h.points >= 0 ? "+" : ""}{h.points}pt
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
 
               <section className="mb-6">
                 <div className="mb-3 flex items-center justify-between">

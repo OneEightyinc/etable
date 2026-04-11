@@ -225,6 +225,68 @@ export async function restoreQueueEntryApi(id: string): Promise<QueueEntryData> 
   return result.entry;
 }
 
+// ─── Points & Rank ──────────────────────────────────────
+export type MemberTier = 'BRONZE' | 'SILVER' | 'GOLD';
+
+export type PointAction =
+  | 'FIRST_VISIT' | 'SURVEY' | 'GOOGLE_REVIEW'
+  | 'REFERRAL_SENT' | 'REFERRAL_RECEIVED'
+  | 'IDLE_TIME_BONUS' | 'STAMP_RALLY' | 'MANUAL';
+
+export interface PointHistoryEntry {
+  id: string;
+  customerId: string;
+  action: PointAction;
+  points: number;
+  description: string;
+  createdAt: string;
+}
+
+export interface CustomerPointsData {
+  totalPoints: number;
+  currentTier: MemberTier;
+  referralCode: string;
+  history: PointHistoryEntry[];
+}
+
+export async function getCustomerPointsApi(customerId: string): Promise<CustomerPointsData> {
+  return request<CustomerPointsData>(`/customer/points?customerId=${customerId}`);
+}
+
+export async function addPointsApi(data: {
+  customerId: string;
+  action: PointAction;
+  points?: number;
+  description?: string;
+}): Promise<{ totalPoints: number; currentTier: MemberTier; history: PointHistoryEntry }> {
+  return request(`/customer/points`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function redeemReferralApi(data: {
+  customerId: string;
+  referralCode: string;
+}): Promise<{ success: boolean; message: string }> {
+  return request(`/customer/referral`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export const TIER_THRESHOLDS = {
+  BRONZE: 0,
+  SILVER: 500,
+  GOLD: 1500,
+} as const;
+
+export const TIER_BENEFITS: Record<MemberTier, string[]> = {
+  BRONZE: [],
+  SILVER: ['ファストパス1回券'],
+  GOLD: ['ファストパス月2回', '1ドリンク無料'],
+};
+
 // ─── SSE ─────────────────────────────────────────────────
 export function subscribeToQueue(
   storeId: string,

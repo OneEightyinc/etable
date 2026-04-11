@@ -37,8 +37,17 @@ const ReservePage: React.FC = () => {
 
   const [count, setCount] = useState(2);
   const [seatType, setSeatType] = useState("テーブル席");
+  const [groupType, setGroupType] = useState<string | null>(null);
   const [agreed, setAgreed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  const groupTypeOptions = [
+    { key: "solo", label: "ひとり", icon: "👤" },
+    { key: "friends", label: "友人", icon: "👥" },
+    { key: "couple", label: "カップル", icon: "💑" },
+    { key: "family", label: "家族", icon: "👨‍👩‍👧" },
+    { key: "business", label: "ビジネス", icon: "💼" },
+  ];
 
   const decrease = () => setCount((prev) => Math.max(1, prev - 1));
   const increase = () => setCount((prev) => Math.min(10, prev + 1));
@@ -180,6 +189,31 @@ const ReservePage: React.FC = () => {
               </button>
             );
           })}
+        </div>
+      </section>
+
+      {/* Group Type - ワンタップ選択 */}
+      <section className="px-4 pt-6">
+        <div className="mb-3 flex items-center gap-2">
+          <span className="inline-block h-[18px] w-[5px] rounded-full bg-[#ff6b00]" />
+          <h2 className="text-[16px] font-bold text-[#111]">ご利用形態</h2>
+        </div>
+        <div className="flex gap-2">
+          {groupTypeOptions.map((opt) => (
+            <button
+              key={opt.key}
+              type="button"
+              onClick={() => setGroupType(opt.key)}
+              className={`flex flex-1 flex-col items-center gap-1 rounded-[16px] border py-3 text-[12px] font-semibold transition-colors ${
+                groupType === opt.key
+                  ? "border-[#ff6b00] bg-[#fff5ef] text-[#ff6b00]"
+                  : "border-[#eee] bg-white text-[#666]"
+              }`}
+            >
+              <span className="text-[18px]">{opt.icon}</span>
+              {opt.label}
+            </button>
+          ))}
         </div>
       </section>
 

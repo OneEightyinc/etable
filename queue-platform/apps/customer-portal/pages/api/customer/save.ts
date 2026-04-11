@@ -49,6 +49,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             displayName: updated.displayName,
             email: updated.email,
             phone: updated.phone,
+            totalPoints: updated.totalPoints ?? 0,
+            currentTier: updated.currentTier ?? "BRONZE",
+            referralCode: updated.referralCode ?? "",
             registeredAt: updated.createdAt,
           },
         });
@@ -67,6 +70,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         displayName: row.displayName,
         email: row.email,
         phone: row.phone,
+        totalPoints: row.totalPoints ?? 0,
+        currentTier: row.currentTier ?? "BRONZE",
+        referralCode: row.referralCode ?? "",
         registeredAt: row.createdAt,
       },
     });

@@ -33,10 +33,20 @@ export {
   createCustomerProfile,
   updateCustomerProfile,
   deleteCustomerProfile,
+  addWaitingSurvey,
+  getWaitingSurveys,
+  addPostVisitReview,
+  getPostVisitReviews,
   addSurveyResponse,
   getSurveyResponses,
   isStoreIdRecognized,
   resolvePublicUrlToken,
+  addPoints,
+  getPointHistory,
+  findCustomerByReferralCode,
+  calculateTier,
+  POINT_RULES,
+  TIER_BENEFITS,
 } from './db';
 
 export type {
@@ -49,6 +59,11 @@ export type {
   StorePortalProfile,
   CustomerProfileRecord,
   SurveyResponse,
+  WaitingSurveyRecord,
+  PostVisitReviewRecord,
+  MemberTier,
+  PointAction,
+  PointHistoryRecord,
 } from './db';
 
 // Auth middleware

@@ -93,6 +93,29 @@ const ReservationStatusPage: React.FC = () => {
   const [notificationMethod, setNotificationMethod] = useState<"未設定" | "メール" | "LINE">("未設定");
   const [emailInput, setEmailInput] = useState("");
 
+  // 待機中アンケート
+  const [surveyCompleted, setSurveyCompleted] = useState(false);
+  const [discoveryChannel, setDiscoveryChannel] = useState<string | null>(null);
+  const [wantToEatMenu, setWantToEatMenu] = useState("");
+  const [surveySubmitting, setSurveySubmitting] = useState(false);
+  const [surveyPointMsg, setSurveyPointMsg] = useState("");
+
+  // 食後レビュー
+  const [showReview, setShowReview] = useState(false);
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewFeedback, setReviewFeedback] = useState("");
+  const [reviewSubmitted, setReviewSubmitted] = useState(false);
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+
+  const discoveryOptions = [
+    { key: "instagram", label: "Instagram" },
+    { key: "tiktok", label: "TikTok" },
+    { key: "google", label: "Google" },
+    { key: "referral", label: "友人紹介" },
+    { key: "walkin", label: "通りがかり" },
+    { key: "other", label: "その他" },
+  ];
+
   useEffect(() => {
     if (!restaurantId) return;
     const list = getReservations().filter(
@@ -173,6 +196,80 @@ const ReservationStatusPage: React.FC = () => {
   const handleConnectLine = () => {
     setNotificationMethod("LINE");
     setIsLineModalOpen(false);
+  };
+
+  const handleSurveySubmit = async () => {
+    if (!discoveryChannel || !reservation || !restaurantId || surveySubmitting) return;
+    setSurveySubmitting(true);
+    try {
+      const res = await fetch("/api/survey/waiting", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          storeId: restaurantId,
+          queueEntryId: reservation.queueEntryId || reservation.id,
+          discoveryChannel,
+          wantToEatMenu,
+        }),
+      });
+      const data = await res.json();
+      setSurveyCompleted(true);
+      if (data.pointsAwarded > 0) {
+        setSurveyPointMsg(`+${data.pointsAwarded}pt 獲得！`);
+        setTimeout(() => setSurveyPointMsg(""), 4000);
+      }
+    } catch {
+      alert("送信に失敗しました");
+    } finally {
+      setSurveySubmitting(false);
+    }
+  };
+
+  const handleReviewSubmit = async () => {
+    if (!reviewRating || !restaurantId || reviewSubmitting) return;
+    setReviewSubmitting(true);
+    try {
+      await fetch("/api/review/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          storeId: restaurantId,
+          queueEntryId: reservation?.queueEntryId,
+          rating: reviewRating,
+          feedback: reviewRating <= 3 ? reviewFeedback : undefined,
+          googleReviewSubmitted: false,
+        }),
+      });
+      setReviewSubmitted(true);
+    } catch {
+      alert("送信に失敗しました");
+    } finally {
+      setReviewSubmitting(false);
+    }
+  };
+
+  const handleGoogleReview = async () => {
+    // Googleレビュー投稿済みとしてポイント付与
+    await fetch("/api/review/submit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({
+        storeId: restaurantId,
+        rating: reviewRating,
+        googleReviewSubmitted: true,
+      }),
+    });
+    // Google Maps レビューページへ（店舗のplace IDが必要、ここではマップ検索にフォールバック）
+    if (restaurant?.address) {
+      window.open(
+        `https://search.google.com/local/writereview?placeid=&q=${encodeURIComponent(restaurant.name)}`,
+        "_blank"
+      );
+    }
+    setReviewSubmitted(true);
   };
 
   const handleRouteGuide = () => {
@@ -291,6 +388,155 @@ const ReservationStatusPage: React.FC = () => {
             </div>
             <p className="ml-7 text-[14px] text-[#666]">到着後すぐにご案内可能です。</p>
           </section>
+
+          {/* 待機中アンケート */}
+          {!surveyCompleted && (
+            <section className="mb-4 rounded-[24px] border border-[#ffe4cc] bg-[#fffaf5] p-5 shadow-[0_4px_12px_rgba(255,107,0,0.08)]">
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="text-[15px] font-bold text-[#111]">待ち時間アンケート</h3>
+                <span className="rounded-full bg-[#ff6b00] px-2.5 py-1 text-[11px] font-bold text-white">+50pt</span>
+              </div>
+              <p className="mb-4 text-[12px] text-[#666]">回答するとポイントがもらえます！</p>
+
+              <div className="mb-4">
+                <p className="mb-2 text-[13px] font-bold text-[#333]">何でこのお店を知りましたか？</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {discoveryOptions.map((opt) => (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      onClick={() => setDiscoveryChannel(opt.key)}
+                      className={`rounded-xl border py-2.5 text-[12px] font-semibold transition-colors ${
+                        discoveryChannel === opt.key
+                          ? "border-[#ff6b00] bg-[#fff5ef] text-[#ff6b00]"
+                          : "border-[#e5e5e5] bg-white text-[#666]"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mb-4">
+                <p className="mb-2 text-[13px] font-bold text-[#333]">食べたいメニューはありますか？（任意）</p>
+                <input
+                  type="text"
+                  value={wantToEatMenu}
+                  onChange={(e) => setWantToEatMenu(e.target.value)}
+                  placeholder="例：ハンバーグ、パスタ..."
+                  className="w-full rounded-xl border border-[#e5e5e5] px-4 py-3 text-[14px] outline-none placeholder:text-[#ccc] focus:border-[#ff6b00]"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={() => void handleSurveySubmit()}
+                disabled={!discoveryChannel || surveySubmitting}
+                className={`w-full rounded-full py-3.5 text-[15px] font-bold text-white transition-colors ${
+                  discoveryChannel && !surveySubmitting ? "bg-[#ff6b00]" : "bg-[#d4d4d8] cursor-not-allowed"
+                }`}
+              >
+                {surveySubmitting ? "送信中..." : "回答してポイントをもらう"}
+              </button>
+            </section>
+          )}
+
+          {surveyCompleted && surveyPointMsg && (
+            <div className="mb-4 rounded-[16px] bg-[#22c55e] p-4 text-center text-[15px] font-bold text-white shadow-lg">
+              {surveyPointMsg}
+            </div>
+          )}
+
+          {surveyCompleted && !surveyPointMsg && (
+            <div className="mb-4 rounded-[16px] border border-[#e5e5e5] bg-white p-4 text-center text-[14px] font-medium text-[#22c55e]">
+              アンケート回答済み ✓
+            </div>
+          )}
+
+          {/* 食後満足度レビュー（手動表示ボタン or 自動表示） */}
+          {!showReview && !reviewSubmitted && (
+            <section className="mb-4">
+              <button
+                type="button"
+                onClick={() => setShowReview(true)}
+                className="w-full rounded-[16px] border border-[#e5e5e5] bg-white py-4 text-center text-[14px] font-bold text-[#ff6b00]"
+              >
+                お食事はいかがでしたか？レビューを書く
+              </button>
+            </section>
+          )}
+
+          {showReview && !reviewSubmitted && (
+            <section className="mb-4 rounded-[24px] border border-[#ffe4cc] bg-[#fffaf5] p-5 shadow-[0_4px_12px_rgba(255,107,0,0.08)]">
+              <h3 className="mb-2 text-center text-[16px] font-bold text-[#111]">本日のお食事はいかがでしたか？</h3>
+              <p className="mb-4 text-center text-[12px] text-[#666]">タップで評価してください</p>
+
+              {/* 星評価 */}
+              <div className="mb-5 flex justify-center gap-2">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    type="button"
+                    onClick={() => setReviewRating(star)}
+                    className="text-[36px] transition-transform active:scale-110"
+                  >
+                    {star <= reviewRating ? "⭐" : "☆"}
+                  </button>
+                ))}
+              </div>
+
+              {/* 星1-3: 内部フィードバック */}
+              {reviewRating >= 1 && reviewRating <= 3 && (
+                <div className="mb-4">
+                  <p className="mb-2 text-[13px] font-bold text-[#333]">改善のご要望をお聞かせください</p>
+                  <textarea
+                    value={reviewFeedback}
+                    onChange={(e) => setReviewFeedback(e.target.value)}
+                    placeholder="ご意見をお聞かせください..."
+                    rows={3}
+                    className="w-full rounded-xl border border-[#e5e5e5] px-4 py-3 text-[14px] outline-none placeholder:text-[#ccc] focus:border-[#ff6b00]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void handleReviewSubmit()}
+                    disabled={reviewSubmitting}
+                    className="mt-3 w-full rounded-full bg-[#082752] py-3.5 text-[15px] font-bold text-white"
+                  >
+                    {reviewSubmitting ? "送信中..." : "フィードバックを送信"}
+                  </button>
+                </div>
+              )}
+
+              {/* 星4-5: Googleレビュー誘導 */}
+              {reviewRating >= 4 && (
+                <div className="mb-4 text-center">
+                  <p className="mb-3 text-[14px] font-bold text-[#22c55e]">ありがとうございます！</p>
+                  <p className="mb-4 text-[13px] text-[#666]">Googleレビューを書くと<span className="font-bold text-[#ff6b00]">+300pt</span>プレゼント！</p>
+                  <button
+                    type="button"
+                    onClick={() => void handleGoogleReview()}
+                    className="mb-3 w-full rounded-full bg-[#ff6b00] py-3.5 text-[15px] font-bold text-white shadow-[0_4px_12px_rgba(255,107,0,0.3)]"
+                  >
+                    Googleレビューを書く（+300pt）
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleReviewSubmit()}
+                    className="w-full rounded-full border border-[#e5e5e5] bg-white py-3 text-[13px] font-medium text-[#999]"
+                  >
+                    スキップ
+                  </button>
+                </div>
+              )}
+            </section>
+          )}
+
+          {reviewSubmitted && (
+            <div className="mb-4 rounded-[16px] border border-[#e5e5e5] bg-white p-4 text-center text-[14px] font-medium text-[#22c55e]">
+              レビューありがとうございました ✓
+            </div>
+          )}
 
           {/* Cancel Button */}
           <section className="mb-4">

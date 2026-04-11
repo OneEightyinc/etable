@@ -56,6 +56,13 @@ export default function SettingsPage() {
   const [message, setMessage] = useState('番号 {number} のお客様、ご来店をお願いいたします。');
   const [autoCancelMinutes, setAutoCancelMinutes] = useState(10);
 
+  // ポイント倍率設定
+  const [idleTimeEnabled, setIdleTimeEnabled] = useState(false);
+  const [idleTimeStart, setIdleTimeStart] = useState('15:00');
+  const [idleTimeEnd, setIdleTimeEnd] = useState('17:00');
+  const [idleTimeDays, setIdleTimeDays] = useState<string[]>(['月', '火', '水', '木', '金']);
+  const [idleTimeMultiplier, setIdleTimeMultiplier] = useState(2);
+
   const [portalDisplayName, setPortalDisplayName] = useState('');
   const [portalCategory, setPortalCategory] = useState('レストラン');
   const [portalImageUrl, setPortalImageUrl] = useState('');
@@ -708,6 +715,95 @@ export default function SettingsPage() {
               />
               <span className="text-xs text-gray-400">分</span>
             </div>
+          </div>
+        </div>
+
+        {/* ポイント倍率設定 Section */}
+        <div>
+          <h2 className="text-sm font-semibold text-[#082752]">ポイント倍率設定</h2>
+          <div className="bg-white rounded-[32px] p-5 border border-gray-100 mt-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-[#082752]">アイドルタイムボーナス</p>
+                <p className="text-xs text-gray-400 mt-0.5">指定時間帯のポイントを倍増</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIdleTimeEnabled(!idleTimeEnabled)}
+                className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${idleTimeEnabled ? 'bg-[#FD780F]' : 'bg-gray-200'}`}
+              >
+                <span className={`inline-block h-5 w-5 rounded-full bg-white shadow-md transition-transform ${idleTimeEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+              </button>
+            </div>
+
+            {idleTimeEnabled && (
+              <>
+                <div>
+                  <label className="text-xs text-gray-500 mb-2 block">倍率</label>
+                  <div className="flex gap-2">
+                    {[1.5, 2, 3].map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => setIdleTimeMultiplier(m)}
+                        className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                          idleTimeMultiplier === m
+                            ? 'bg-[#082752] text-white'
+                            : 'bg-gray-50 text-gray-500 border border-gray-200'
+                        }`}
+                      >
+                        {m}倍
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">開始時刻</label>
+                    <input
+                      type="time"
+                      value={idleTimeStart}
+                      onChange={(e) => setIdleTimeStart(e.target.value)}
+                      className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-[#082752] outline-none focus:border-[#FD780F]"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">終了時刻</label>
+                    <input
+                      type="time"
+                      value={idleTimeEnd}
+                      onChange={(e) => setIdleTimeEnd(e.target.value)}
+                      className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-[#082752] outline-none focus:border-[#FD780F]"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs text-gray-500 mb-2 block">対象曜日</label>
+                  <div className="flex gap-1.5">
+                    {['月', '火', '水', '木', '金', '土', '日'].map((day) => (
+                      <button
+                        key={day}
+                        type="button"
+                        onClick={() =>
+                          setIdleTimeDays((prev) =>
+                            prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]
+                          )
+                        }
+                        className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${
+                          idleTimeDays.includes(day)
+                            ? 'bg-[#FD780F] text-white'
+                            : 'bg-gray-50 text-gray-400 border border-gray-200'
+                        }`}
+                      >
+                        {day}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>

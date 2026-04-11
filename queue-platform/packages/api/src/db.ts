@@ -92,8 +92,78 @@ export interface CustomerProfileRecord {
   displayName: string;
   email: string;
   phone: string;
+  totalPoints: number;
+  currentTier: MemberTier;
+  referralCode: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export type MemberTier = "BRONZE" | "SILVER" | "GOLD";
+
+export type PointAction =
+  | "FIRST_VISIT"       // 初回登録＋来店 +300
+  | "SURVEY"            // 待機中アンケート +50
+  | "GOOGLE_REVIEW"     // Googleレビュー投稿 +300
+  | "REFERRAL_SENT"     // 友達招待（招待者側）+150
+  | "REFERRAL_RECEIVED" // 友達招待（被招待者側）+150
+  | "IDLE_TIME_BONUS"   // アイドルタイムボーナス
+  | "STAMP_RALLY"       // スタンプラリー
+  | "MANUAL";           // 手動調整
+
+export interface PointHistoryRecord {
+  id: string;
+  customerId: string;
+  action: PointAction;
+  points: number;
+  description: string;
+  createdAt: string;
+}
+
+/** アクション別の基本付与ポイント */
+export const POINT_RULES: Record<string, number> = {
+  FIRST_VISIT: 300,
+  SURVEY: 50,
+  GOOGLE_REVIEW: 300,
+  REFERRAL_SENT: 150,
+  REFERRAL_RECEIVED: 150,
+};
+
+/** ランク判定閾値 */
+export function calculateTier(totalPoints: number): MemberTier {
+  if (totalPoints >= 1500) return "GOLD";
+  if (totalPoints >= 500) return "SILVER";
+  return "BRONZE";
+}
+
+/** ランク別特典 */
+export const TIER_BENEFITS: Record<MemberTier, string[]> = {
+  BRONZE: [],
+  SILVER: ["ファストパス1回券"],
+  GOLD: ["ファストパス月2回", "1ドリンク無料"],
+};
+
+/** 待機中ミニアンケート */
+export interface WaitingSurveyRecord {
+  id: string;
+  storeId: string;
+  customerId?: string;
+  queueEntryId: string;
+  discoveryChannel: string;   // Instagram, TikTok, Google, 友人紹介, 通りがかり, etc.
+  wantToEatMenu: string;      // 食べたいメニュー（自由記述）
+  createdAt: string;
+}
+
+/** 食後満足度レビュー */
+export interface PostVisitReviewRecord {
+  id: string;
+  storeId: string;
+  customerId?: string;
+  queueEntryId?: string;
+  rating: number;             // 1-5
+  feedback?: string;          // 星1-3の場合の内部フィードバック
+  googleReviewSubmitted: boolean;
+  createdAt: string;
 }
 
 export interface SurveyResponse {
@@ -150,6 +220,9 @@ interface Database {
   storeSettings: StoreSettings[];
   customerProfiles: CustomerProfileRecord[];
   surveyResponses: SurveyResponse[];
+  pointHistory: PointHistoryRecord[];
+  waitingSurveys: WaitingSurveyRecord[];
+  postVisitReviews: PostVisitReviewRecord[];
 }
 
 const REMOTE_DB_KEY = "queue-platform:database:v1";
@@ -277,6 +350,9 @@ function getDefaultDb(): Database {
     storeSettings: [],
     customerProfiles: [],
     surveyResponses: [],
+    pointHistory: [],
+    waitingSurveys: [],
+    postVisitReviews: [],
   };
 }
 
@@ -300,6 +376,9 @@ function normalizeDatabase(raw: unknown): Database {
       ? (d.customerProfiles as CustomerProfileRecord[])
       : [],
     surveyResponses: Array.isArray(d.surveyResponses) ? (d.surveyResponses as SurveyResponse[]) : [],
+    pointHistory: Array.isArray(d.pointHistory) ? (d.pointHistory as PointHistoryRecord[]) : [],
+    waitingSurveys: Array.isArray(d.waitingSurveys) ? (d.waitingSurveys as WaitingSurveyRecord[]) : [],
+    postVisitReviews: Array.isArray(d.postVisitReviews) ? (d.postVisitReviews as PostVisitReviewRecord[]) : [],
   };
 }
 
@@ -903,6 +982,9 @@ export async function createCustomerProfile(data: {
     displayName: data.displayName.trim(),
     email: (data.email ?? "").trim(),
     phone: (data.phone ?? "").trim(),
+    totalPoints: 0,
+    currentTier: "BRONZE",
+    referralCode: crypto.randomBytes(4).toString("hex").toUpperCase(),
     createdAt: now,
     updatedAt: now,
   };
@@ -938,6 +1020,93 @@ export async function deleteCustomerProfile(id: string): Promise<boolean> {
     return true;
   }
   return false;
+}
+
+// ─── Points ─────────────────────────────────────────────
+
+/** ポイント付与（顧客のtotalPoints・currentTierも更新） */
+export async function addPoints(
+  customerId: string,
+  action: PointAction,
+  points: number,
+  description: string
+): Promise<{ profile: CustomerProfileRecord; history: PointHistoryRecord }> {
+  const db = await readDatabase();
+  if (!db.pointHistory) db.pointHistory = [];
+  const profile = (db.customerProfiles ?? []).find((c) => c.id === customerId);
+  if (!profile) throw new Error("顧客が見つかりません");
+
+  const record: PointHistoryRecord = {
+    id: crypto.randomUUID(),
+    customerId,
+    action,
+    points,
+    description,
+    createdAt: new Date().toISOString(),
+  };
+  db.pointHistory.push(record);
+
+  // プロフィール更新
+  profile.totalPoints = (profile.totalPoints ?? 0) + points;
+  profile.currentTier = calculateTier(profile.totalPoints);
+  profile.updatedAt = new Date().toISOString();
+
+  await persistDatabase();
+  return { profile, history: record };
+}
+
+/** ポイント履歴取得 */
+export async function getPointHistory(customerId: string): Promise<PointHistoryRecord[]> {
+  const db = await readDatabase();
+  return (db.pointHistory ?? [])
+    .filter((h) => h.customerId === customerId)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+}
+
+/** 招待コードから顧客を検索 */
+export async function findCustomerByReferralCode(code: string): Promise<CustomerProfileRecord | undefined> {
+  const db = await readDatabase();
+  return (db.customerProfiles ?? []).find((c) => c.referralCode === code.toUpperCase());
+}
+
+// ─── Waiting Survey ─────────────────────────────────────
+
+export async function addWaitingSurvey(data: Omit<WaitingSurveyRecord, "id" | "createdAt">): Promise<WaitingSurveyRecord> {
+  const db = await readDatabase();
+  if (!db.waitingSurveys) db.waitingSurveys = [];
+  const record: WaitingSurveyRecord = {
+    id: crypto.randomUUID(),
+    ...data,
+    createdAt: new Date().toISOString(),
+  };
+  db.waitingSurveys.push(record);
+  await persistDatabase();
+  return record;
+}
+
+export async function getWaitingSurveys(storeId: string): Promise<WaitingSurveyRecord[]> {
+  const db = await readDatabase();
+  return (db.waitingSurveys ?? []).filter((s) => s.storeId === storeId);
+}
+
+// ─── Post-Visit Reviews ────────────────────────────────
+
+export async function addPostVisitReview(data: Omit<PostVisitReviewRecord, "id" | "createdAt">): Promise<PostVisitReviewRecord> {
+  const db = await readDatabase();
+  if (!db.postVisitReviews) db.postVisitReviews = [];
+  const record: PostVisitReviewRecord = {
+    id: crypto.randomUUID(),
+    ...data,
+    createdAt: new Date().toISOString(),
+  };
+  db.postVisitReviews.push(record);
+  await persistDatabase();
+  return record;
+}
+
+export async function getPostVisitReviews(storeId: string): Promise<PostVisitReviewRecord[]> {
+  const db = await readDatabase();
+  return (db.postVisitReviews ?? []).filter((r) => r.storeId === storeId);
 }
 
 // ─── Survey Responses ───────────────────────────────────

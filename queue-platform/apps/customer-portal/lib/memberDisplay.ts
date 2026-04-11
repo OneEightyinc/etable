@@ -28,19 +28,27 @@ export function formatMemberNameLine(displayName: string): string {
   return t;
 }
 
-export type MemberTier = "bronze" | "silver" | "gold";
+export type MemberTier = "BRONZE" | "SILVER" | "GOLD";
 
+/** ランク判定（サーバーのcalculateTierと同じロジック） */
+export function tierFromPoints(totalPoints: number): MemberTier {
+  if (totalPoints >= 1500) return "GOLD";
+  if (totalPoints >= 500) return "SILVER";
+  return "BRONZE";
+}
+
+/** 後方互換: 月間来店数からのランク判定 */
 export function tierFromMonthlyVisits(visits: number): MemberTier {
-  if (visits >= 10) return "gold";
-  if (visits >= 4) return "silver";
-  return "bronze";
+  if (visits >= 10) return "GOLD";
+  if (visits >= 4) return "SILVER";
+  return "BRONZE";
 }
 
 export function tierLabel(tier: MemberTier): string {
   switch (tier) {
-    case "gold":
+    case "GOLD":
       return "GOLD MEMBER";
-    case "silver":
+    case "SILVER":
       return "SILVER MEMBER";
     default:
       return "BRONZE MEMBER";
@@ -49,39 +57,68 @@ export function tierLabel(tier: MemberTier): string {
 
 export function tierBenefit(tier: MemberTier): string {
   switch (tier) {
-    case "gold":
-      return "優先案内・特典メニュー";
-    case "silver":
-      return "ドリンク無料";
+    case "GOLD":
+      return "ファストパス月2回＋1ドリンク無料";
+    case "SILVER":
+      return "ファストパス1回券";
     default:
-      return "お会計 5% OFF";
+      return "";
+  }
+}
+
+export function tierBenefitList(tier: MemberTier): string[] {
+  switch (tier) {
+    case "GOLD":
+      return ["ファストパス月2回", "1ドリンク無料"];
+    case "SILVER":
+      return ["ファストパス1回券"];
+    default:
+      return [];
   }
 }
 
 export function nextTierLabel(tier: MemberTier): string {
-  if (tier === "gold") return "プラチナ";
-  if (tier === "silver") return "ゴールド";
+  if (tier === "GOLD") return "";
+  if (tier === "SILVER") return "ゴールド";
   return "シルバー";
 }
 
-/** 来店に連動した表示用ポイント（参照の 1280pt 相当になりやすい係数） */
-export function displayPointsFromVisits(monthlyVisits: number): number {
-  return Math.min(99999, 640 + monthlyVisits * 160);
-}
+export const TIER_THRESHOLDS = {
+  BRONZE: 0,
+  SILVER: 500,
+  GOLD: 1500,
+} as const;
 
 export function pointsProgress(
-  points: number,
+  totalPoints: number,
   tier: MemberTier
-): { nextLabel: string; remaining: number; percent: number } {
-  const thresholds: Record<MemberTier, { next: number; name: string }> = {
-    bronze: { next: 1000, name: "シルバー" },
-    silver: { next: 1600, name: "ゴールド" },
-    gold: { next: 2400, name: "プラチナ" },
+): { nextLabel: string; remaining: number; percent: number; nextThreshold: number } {
+  if (tier === "GOLD") {
+    return { nextLabel: "", remaining: 0, percent: 100, nextThreshold: 1500 };
+  }
+  const nextThreshold = tier === "SILVER" ? 1500 : 500;
+  const nextLabel = tier === "SILVER" ? "ゴールド" : "シルバー";
+  const currentBase = TIER_THRESHOLDS[tier];
+  const range = nextThreshold - currentBase;
+  const progress = totalPoints - currentBase;
+  const remaining = Math.max(0, nextThreshold - totalPoints);
+  const percent = Math.min(100, Math.round((progress / range) * 100));
+  return { nextLabel, remaining, percent, nextThreshold };
+}
+
+/** ポイントアクションの日本語ラベル */
+export function pointActionLabel(action: string): string {
+  const labels: Record<string, string> = {
+    FIRST_VISIT: "初回登録＋来店",
+    SURVEY: "アンケート回答",
+    GOOGLE_REVIEW: "Googleレビュー",
+    REFERRAL_SENT: "友達招待",
+    REFERRAL_RECEIVED: "招待特典",
+    IDLE_TIME_BONUS: "アイドルタイムボーナス",
+    STAMP_RALLY: "スタンプラリー",
+    MANUAL: "調整",
   };
-  const { next, name } = thresholds[tier];
-  const remaining = Math.max(0, next - points);
-  const percent = Math.min(100, Math.round((points / next) * 100));
-  return { nextLabel: name, remaining, percent };
+  return labels[action] ?? action;
 }
 
 export function countVisitsThisMonth(isoDates: string[]): number {

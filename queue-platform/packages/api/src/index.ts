@@ -24,6 +24,11 @@ export {
   updateStoreSettingsApi,
   getQueueHistoryApi,
   restoreQueueEntryApi,
+  getCustomerPointsApi,
+  addPointsApi,
+  redeemReferralApi,
+  TIER_THRESHOLDS,
+  TIER_BENEFITS,
 } from './api-client';
 
 export type {
@@ -32,6 +37,10 @@ export type {
   AccountPublicUrlTokens,
   QueueEntryData,
   StoreSettingsData,
+  MemberTier,
+  PointAction,
+  PointHistoryEntry,
+  CustomerPointsData,
 } from './api-client';
 
 export {

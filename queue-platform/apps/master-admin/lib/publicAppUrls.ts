@@ -77,6 +77,25 @@ export function customerPortalEntryUrl(base: string, publicToken: string): strin
   return `${b}/p/${publicToken}`;
 }
 
+/** 店舗メニュー管理（/a/:token → /menu） */
+export function storeAdminMenuUrl(base: string, publicToken: string): string {
+  const entry = storeAdminEntryUrl(base, publicToken);
+  return entry === "#" ? "#" : `${entry}/menu`;
+}
+
+/** 店舗注文管理（/a/:token → /orders） */
+export function storeAdminOrdersUrl(base: string, publicToken: string): string {
+  const entry = storeAdminEntryUrl(base, publicToken);
+  return entry === "#" ? "#" : `${entry}/orders`;
+}
+
+/** QR注文ページ（顧客ポータル /order/:storeId） */
+export function qrOrderUrl(customerPortalBase: string, storeId: string): string {
+  const base = trimBase(customerPortalBase);
+  if (!base) return "#";
+  return `${base}/order/${encodeURIComponent(storeId)}`;
+}
+
 /** 来店アンケート（/q/:token） */
 export function surveyPublicUrl(customerPortalBase: string, surveyToken: string): string {
   const base = trimBase(customerPortalBase);

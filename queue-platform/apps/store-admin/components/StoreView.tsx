@@ -645,6 +645,10 @@ const StoreView: React.FC<{ storeId?: string; onLogout?: () => void }> = ({
                     <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M3 12h18M3 18h18" /></svg>
                     <span className="font-medium">メニュー管理</span>
                   </Link>
+                  <Link href={storeScopedPath(publicToken, "/tables", storeId)} className="w-full flex items-center gap-3 px-4 py-3.5 bg-purple-50 text-purple-700 border-2 border-purple-300 rounded-xl hover:bg-purple-100 transition-colors">
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="3" height="3" /><rect x="18" y="18" width="3" height="3" /></svg>
+                    <span className="font-medium">テーブル・QR管理</span>
+                  </Link>
                   <Link href={storeScopedPath(publicToken, "/orders", storeId)} className="w-full flex items-center gap-3 px-4 py-3.5 bg-[#FD780F]/10 text-[#FD780F] border-2 border-[#FD780F] rounded-xl hover:bg-[#FD780F]/20 transition-colors">
                     <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" /><rect x="9" y="3" width="6" height="4" rx="1" /><path d="M9 14l2 2 4-4" /></svg>
                     <span className="font-medium">注文・会計</span>

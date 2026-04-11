@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { storeScopedPath } from '../lib/storePaths';
@@ -16,6 +16,7 @@ interface MenuItem {
   price: number;
   categoryId: string;
   description?: string;
+  imageUrl?: string;
   soldOut: boolean;
 }
 
@@ -43,6 +44,9 @@ export default function MenuPage() {
   const [itemPrice, setItemPrice] = useState('');
   const [itemCategoryId, setItemCategoryId] = useState('');
   const [itemDescription, setItemDescription] = useState('');
+  const [itemImageUrl, setItemImageUrl] = useState('');
+  const [imageUploading, setImageUploading] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   // Delete confirmation
@@ -136,6 +140,7 @@ export default function MenuPage() {
     setItemPrice('');
     setItemCategoryId(categories[0]?.id || '');
     setItemDescription('');
+    setItemImageUrl('');
     setShowItemModal(true);
   };
 
@@ -145,7 +150,34 @@ export default function MenuPage() {
     setItemPrice(String(item.price));
     setItemCategoryId(item.categoryId);
     setItemDescription(item.description || '');
+    setItemImageUrl(item.imageUrl || '');
     setShowItemModal(true);
+  };
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImageUploading(true);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = document.createElement("img");
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const size = 400;
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext("2d")!;
+        const min = Math.min(img.width, img.height);
+        const sx = (img.width - min) / 2;
+        const sy = (img.height - min) / 2;
+        ctx.drawImage(img, sx, sy, min, min, 0, 0, size, size);
+        setItemImageUrl(canvas.toDataURL("image/jpeg", 0.8));
+        setImageUploading(false);
+      };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+    if (imageInputRef.current) imageInputRef.current.value = "";
   };
 
   const handleSaveItem = async () => {
@@ -166,6 +198,7 @@ export default function MenuPage() {
           price,
           categoryId: itemCategoryId,
           description: itemDescription.trim() || undefined,
+          imageUrl: itemImageUrl || undefined,
         }),
       });
       setShowItemModal(false);
@@ -377,6 +410,11 @@ export default function MenuPage() {
                         className={`bg-white rounded-[32px] p-5 border border-gray-100 transition ${item.soldOut ? 'opacity-50' : ''}`}
                       >
                         <div className="flex items-center justify-between">
+                          {item.imageUrl && (
+                            <div className="shrink-0 mr-3 h-14 w-14 overflow-hidden rounded-xl bg-gray-100">
+                              <img src={item.imageUrl} alt="" className="h-full w-full object-cover" />
+                            </div>
+                          )}
                           <div className="flex-1 min-w-0">
                             <p className="text-base font-semibold text-[#082752] truncate">{item.name}</p>
                             <p className="text-sm text-gray-400 mt-0.5">¥{item.price.toLocaleString()}</p>
@@ -547,6 +585,48 @@ export default function MenuPage() {
                       <option key={cat.id} value={cat.id}>{cat.name}</option>
                     ))}
                   </select>
+                </div>
+
+                {/* Image */}
+                <div>
+                  <label className="text-xs font-bold text-gray-400 block mb-1">写真（任意）</label>
+                  <div className="flex items-center gap-4">
+                    {itemImageUrl ? (
+                      <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-gray-100">
+                        <img src={itemImageUrl} alt="" className="h-full w-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => setItemImageUrl('')}
+                          className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] text-white"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => imageInputRef.current?.click()}
+                        disabled={imageUploading}
+                        className="flex h-20 w-20 shrink-0 flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-200 text-gray-300 hover:border-[#FD780F] hover:text-[#FD780F] transition-colors"
+                      >
+                        <svg className="h-6 w-6 mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" />
+                          <circle cx="12" cy="13" r="4" />
+                        </svg>
+                        <span className="text-[9px] font-bold">{imageUploading ? '処理中' : '追加'}</span>
+                      </button>
+                    )}
+                    <input
+                      ref={imageInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleImageSelect}
+                    />
+                    <p className="text-[11px] text-gray-400 leading-relaxed">
+                      写真をタップして選択。<br />正方形にクロップされます。
+                    </p>
+                  </div>
                 </div>
 
                 {/* Description */}

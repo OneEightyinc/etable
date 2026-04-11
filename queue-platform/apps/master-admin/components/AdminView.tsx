@@ -13,6 +13,9 @@ import {
   isLocalHostname,
   kioskEntryUrl,
   storeAdminEntryUrl,
+  storeAdminMenuUrl,
+  storeAdminOrdersUrl,
+  qrOrderUrl,
   customerPortalEntryUrl,
   surveyPublicUrl,
 } from '../lib/publicAppUrls';
@@ -452,6 +455,33 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
                               <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
                               アンケート
                             </a>
+                            <a
+                              href={storeAdminMenuUrl(appUrls.storeAdmin, acc.publicUrlTokens?.storeAdmin ?? '')}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs font-inter font-bold text-amber-700 transition-colors hover:bg-amber-100 hover:underline"
+                            >
+                              <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 6h18M3 12h18M3 18h18" /></svg>
+                              メニュー管理
+                            </a>
+                            <a
+                              href={storeAdminOrdersUrl(appUrls.storeAdmin, acc.publicUrlTokens?.storeAdmin ?? '')}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg bg-blue-50 px-2.5 py-1.5 text-xs font-inter font-bold text-blue-700 transition-colors hover:bg-blue-100 hover:underline"
+                            >
+                              <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" /><rect x="9" y="3" width="6" height="4" rx="1" /><path d="M9 14l2 2 4-4" /></svg>
+                              注文・会計
+                            </a>
+                            <a
+                              href={qrOrderUrl(appUrls.customer, acc.id)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg bg-purple-50 px-2.5 py-1.5 text-xs font-inter font-bold text-purple-700 transition-colors hover:bg-purple-100 hover:underline"
+                            >
+                              <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="3" height="3" /><rect x="18" y="18" width="3" height="3" /><rect x="14" y="18" width="3" height="3" /><rect x="18" y="14" width="3" height="3" /></svg>
+                              QR注文
+                            </a>
                           </div>
                         </td>
                         <td className="px-6 lg:px-10 py-6 text-xs lg:text-sm text-gray-400 font-inter font-medium">{acc.createdAt?.slice(0, 10)}</td>
@@ -524,6 +554,33 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
                       >
                         <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
                         アンケート
+                      </a>
+                      <a
+                        href={storeAdminMenuUrl(appUrls.storeAdmin, acc.publicUrlTokens?.storeAdmin ?? '')}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700"
+                      >
+                        <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 6h18M3 12h18M3 18h18" /></svg>
+                        メニュー管理
+                      </a>
+                      <a
+                        href={storeAdminOrdersUrl(appUrls.storeAdmin, acc.publicUrlTokens?.storeAdmin ?? '')}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700"
+                      >
+                        <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" /><rect x="9" y="3" width="6" height="4" rx="1" /><path d="M9 14l2 2 4-4" /></svg>
+                        注文・会計
+                      </a>
+                      <a
+                        href={qrOrderUrl(appUrls.customer, acc.id)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg bg-purple-50 px-3 py-1.5 text-xs font-bold text-purple-700"
+                      >
+                        <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="3" height="3" /><rect x="18" y="18" width="3" height="3" /></svg>
+                        QR注文
                       </a>
                     </div>
                     <div className="flex items-center justify-between pt-3 border-t border-gray-50">

@@ -8,6 +8,8 @@ import {
   deleteAccountApi,
   type AccountData,
 } from '@queue-platform/api';
+
+const basePrefix = process.env.NEXT_PUBLIC_BASE_PATH || "";
 import { useAppBaseUrls } from '../hooks/useAppBaseUrls';
 import {
   isLocalHostname,
@@ -163,7 +165,7 @@ const AdminView: React.FC<AdminViewProps> = ({ onLogout }) => {
       <div className="flex flex-col mb-8">
         <div className="select-none">
           <img
-            src="/circlx_white.svg"
+            src={`${basePrefix}/circlx_white.svg`}
             alt="CIRCLX"
             width={150}
             height={50}

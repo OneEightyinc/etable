@@ -1,8 +1,11 @@
 import type { NextConfig } from "next";
 
+const basePath = process.env.VERCEL ? "/admin" : "";
+
 const nextConfig: NextConfig = {
-  basePath: process.env.VERCEL ? "/admin" : "",
+  basePath,
   env: {
+    NEXT_PUBLIC_BASE_PATH: basePath,
     NEXT_PUBLIC_API_PREFIX: process.env.NEXT_PUBLIC_API_PREFIX ?? "",
     NEXT_PUBLIC_STORE_ADMIN_URL: process.env.NEXT_PUBLIC_STORE_ADMIN_URL ?? "",
     NEXT_PUBLIC_KIOSK_URL: process.env.NEXT_PUBLIC_KIOSK_URL ?? "",

@@ -3,6 +3,8 @@ import React, { useState } from 'react';
 import GlassModal from './GlassModal';
 import { login } from '@queue-platform/api';
 
+const basePrefix = process.env.NEXT_PUBLIC_BASE_PATH || "";
+
 interface LoginViewProps {
   onLogin: () => void;
 }
@@ -44,7 +46,7 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
         <div className="flex flex-col items-center mb-10 text-center px-2">
           <div className="select-none flex w-full max-w-[320px] justify-center overflow-visible">
             <img
-              src="/circlx_black.svg"
+              src={`${basePrefix}/circlx_black.svg`}
               alt="CIRCLX"
               width={489}
               height={82}

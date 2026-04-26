@@ -29,6 +29,116 @@ const ExclamationCircleIcon = () => (
   </svg>
 );
 
+/* ---------- Group Type SVG Icons ---------- */
+const GroupTypeIcon: React.FC<{ type: string; active: boolean }> = ({ type, active }) => {
+  const color = active ? "#ff6b00" : "#999";
+  const size = 22;
+  const props = { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: color, strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+
+  switch (type) {
+    case "solo":
+      return (
+        <svg {...props}>
+          <circle cx="12" cy="8" r="3.5" />
+          <path d="M5.5 21a6.5 6.5 0 0 1 13 0" />
+        </svg>
+      );
+    case "friends":
+      return (
+        <svg {...props}>
+          <circle cx="9" cy="8" r="3" />
+          <path d="M3 21a6 6 0 0 1 12 0" />
+          <circle cx="18" cy="9" r="2.5" />
+          <path d="M21 21a4.5 4.5 0 0 0-5-4.4" />
+        </svg>
+      );
+    case "couple":
+      return (
+        <svg {...props}>
+          <path d="M12 4C10.5 2.5 8 2.5 6.5 4S5.5 8 12 13c6.5-5 6-6.5 5.5-9S13.5 2.5 12 4z" fill={active ? "#ff6b0030" : "none"} />
+        </svg>
+      );
+    case "family":
+      return (
+        <svg {...props}>
+          <circle cx="8" cy="6" r="2.5" />
+          <circle cx="16" cy="6" r="2.5" />
+          <path d="M3 19a5 5 0 0 1 10 0" />
+          <path d="M11 19a5 5 0 0 1 10 0" />
+          <circle cx="12" cy="13" r="2" />
+          <path d="M8.5 22a3.5 3.5 0 0 1 7 0" />
+        </svg>
+      );
+    case "business":
+      return (
+        <svg {...props}>
+          <rect x="4" y="10" width="16" height="10" rx="2" />
+          <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+          <line x1="12" y1="14" x2="12" y2="16" />
+        </svg>
+      );
+    default:
+      return null;
+  }
+};
+
+const VisitPurposeIcon: React.FC<{ type: string; active: boolean }> = ({ type, active }) => {
+  const color = active ? "#ff6b00" : "#999";
+  const size = 22;
+  const props = { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: color, strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+
+  switch (type) {
+    case "lunch":
+      return (
+        <svg {...props}>
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 3v9l4 2" />
+        </svg>
+      );
+    case "dinner":
+      return (
+        <svg {...props}>
+          <path d="M12 3a6 6 0 0 0-6 6c0 4 6 12 6 12s6-8 6-12a6 6 0 0 0-6-6z" fill={active ? "#ff6b0020" : "none"} />
+          <circle cx="12" cy="9" r="1.5" fill={color} />
+        </svg>
+      );
+    case "drinking":
+      return (
+        <svg {...props}>
+          <path d="M8 2l1.5 9H14.5L16 2" />
+          <path d="M12 11v7" />
+          <path d="M8 22h8" />
+          <path d="M8 2h8" />
+        </svg>
+      );
+    case "date":
+      return (
+        <svg {...props}>
+          <path d="M12 4C10.5 2.5 8 2.5 6.5 4S5.5 8 12 13c6.5-5 6-6.5 5.5-9S13.5 2.5 12 4z" fill={active ? "#ff6b0030" : "none"} />
+        </svg>
+      );
+    case "work_cafe":
+      return (
+        <svg {...props}>
+          <rect x="3" y="4" width="18" height="14" rx="2" />
+          <line x1="3" y1="10" x2="21" y2="10" />
+          <path d="M8 22h8" />
+          <path d="M12 18v4" />
+        </svg>
+      );
+    case "other":
+      return (
+        <svg {...props}>
+          <circle cx="12" cy="12" r="10" />
+          <path d="M9 9a3 3 0 015.12 1c0 2-3 3-3 3" />
+          <circle cx="12" cy="17" r="0.5" fill={color} />
+        </svg>
+      );
+    default:
+      return null;
+  }
+};
+
 const ReservePage: React.FC = () => {
   const router = useRouter();
   const rid = router.query.id;
@@ -37,16 +147,26 @@ const ReservePage: React.FC = () => {
 
   const [count, setCount] = useState(2);
   const [seatType, setSeatType] = useState("テーブル席");
+  const [visitPurpose, setVisitPurpose] = useState<string | null>(null);
   const [groupType, setGroupType] = useState<string | null>(null);
   const [agreed, setAgreed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  const visitPurposeOptions = [
+    { key: "lunch", label: "ランチ" },
+    { key: "dinner", label: "ディナー" },
+    { key: "drinking", label: "飲み会" },
+    { key: "date", label: "デート" },
+    { key: "work_cafe", label: "仕事・作業" },
+    { key: "other", label: "その他" },
+  ];
+
   const groupTypeOptions = [
-    { key: "solo", label: "ひとり", icon: "👤" },
-    { key: "friends", label: "友人", icon: "👥" },
-    { key: "couple", label: "カップル", icon: "💑" },
-    { key: "family", label: "家族", icon: "👨‍👩‍👧" },
-    { key: "business", label: "ビジネス", icon: "💼" },
+    { key: "solo", label: "ひとり" },
+    { key: "friends", label: "友人" },
+    { key: "couple", label: "カップル" },
+    { key: "family", label: "家族" },
+    { key: "business", label: "ビジネス" },
   ];
 
   const decrease = () => setCount((prev) => Math.max(1, prev - 1));
@@ -192,6 +312,34 @@ const ReservePage: React.FC = () => {
         </div>
       </section>
 
+      {/* Visit Purpose - ワンタップ選択 */}
+      <section className="px-4 pt-6">
+        <div className="mb-3 flex items-center gap-2">
+          <span className="inline-block h-[18px] w-[5px] rounded-full bg-[#ff6b00]" />
+          <h2 className="text-[16px] font-bold text-[#111]">ご利用目的</h2>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          {visitPurposeOptions.map((opt) => {
+            const isActive = visitPurpose === opt.key;
+            return (
+              <button
+                key={opt.key}
+                type="button"
+                onClick={() => setVisitPurpose(opt.key)}
+                className={`flex flex-col items-center gap-1.5 rounded-[16px] border py-3 text-[12px] font-semibold transition-colors ${
+                  isActive
+                    ? "border-[#ff6b00] bg-[#fff5ef] text-[#ff6b00]"
+                    : "border-[#eee] bg-white text-[#666]"
+                }`}
+              >
+                <VisitPurposeIcon type={opt.key} active={isActive} />
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
       {/* Group Type - ワンタップ選択 */}
       <section className="px-4 pt-6">
         <div className="mb-3 flex items-center gap-2">
@@ -199,21 +347,24 @@ const ReservePage: React.FC = () => {
           <h2 className="text-[16px] font-bold text-[#111]">ご利用形態</h2>
         </div>
         <div className="flex gap-2">
-          {groupTypeOptions.map((opt) => (
-            <button
-              key={opt.key}
-              type="button"
-              onClick={() => setGroupType(opt.key)}
-              className={`flex flex-1 flex-col items-center gap-1 rounded-[16px] border py-3 text-[12px] font-semibold transition-colors ${
-                groupType === opt.key
-                  ? "border-[#ff6b00] bg-[#fff5ef] text-[#ff6b00]"
-                  : "border-[#eee] bg-white text-[#666]"
-              }`}
-            >
-              <span className="text-[18px]">{opt.icon}</span>
-              {opt.label}
-            </button>
-          ))}
+          {groupTypeOptions.map((opt) => {
+            const isActive = groupType === opt.key;
+            return (
+              <button
+                key={opt.key}
+                type="button"
+                onClick={() => setGroupType(opt.key)}
+                className={`flex flex-1 flex-col items-center gap-1.5 rounded-[16px] border py-3 text-[12px] font-semibold transition-colors ${
+                  isActive
+                    ? "border-[#ff6b00] bg-[#fff5ef] text-[#ff6b00]"
+                    : "border-[#eee] bg-white text-[#666]"
+                }`}
+              >
+                <GroupTypeIcon type={opt.key} active={isActive} />
+                {opt.label}
+              </button>
+            );
+          })}
         </div>
       </section>
 

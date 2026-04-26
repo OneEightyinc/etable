@@ -48,6 +48,10 @@ export interface QueueEntry {
   calledAt?: string;
   createdAt: string;
   updatedAt: string;
+  /** ユーザーが後回しにした回数 */
+  userPostponedCount?: number;
+  /** 会員顧客ID（ポイント付与用） */
+  customerId?: string;
 }
 
 export interface Session {
@@ -84,6 +88,14 @@ export interface StoreSettings {
   portalHoursSummary: string;
   portalMenuItems: { name: string; price: string }[];
   portalReviews: { author: string; rating: number; comment: string }[];
+  /** アイドルタイムボーナス設定 */
+  idleTimeBonus?: {
+    enabled: boolean;
+    startHour: number;   // e.g. 14
+    endHour: number;     // e.g. 17
+    bonusPoints: number; // e.g. 100 (通常来店100pt + bonus 100pt = 合計200pt)
+    days: string[];      // e.g. ["mon","tue","wed","thu","fri"]
+  };
 }
 
 /** 顧客ポータル会員（DB 永続化） */
@@ -103,12 +115,13 @@ export interface CustomerProfileRecord {
 export type MemberTier = "BRONZE" | "SILVER" | "GOLD";
 
 export type PointAction =
-  | "FIRST_VISIT"       // 初回登録＋来店 +300
+  | "FIRST_VISIT"       // 初回会員登録 +200
+  | "VISIT"             // 来店（案内完了時） +100
   | "SURVEY"            // 待機中アンケート +50
   | "GOOGLE_REVIEW"     // Googleレビュー投稿 +300
   | "REFERRAL_SENT"     // 友達招待（招待者側）+150
   | "REFERRAL_RECEIVED" // 友達招待（被招待者側）+150
-  | "IDLE_TIME_BONUS"   // アイドルタイムボーナス
+  | "IDLE_TIME_BONUS"   // アイドルタイムボーナス +100
   | "STAMP_RALLY"       // スタンプラリー
   | "MANUAL";           // 手動調整
 
@@ -123,11 +136,13 @@ export interface PointHistoryRecord {
 
 /** アクション別の基本付与ポイント */
 export const POINT_RULES: Record<string, number> = {
-  FIRST_VISIT: 300,
+  FIRST_VISIT: 200,
+  VISIT: 100,
   SURVEY: 50,
   GOOGLE_REVIEW: 300,
   REFERRAL_SENT: 150,
   REFERRAL_RECEIVED: 150,
+  IDLE_TIME_BONUS: 100,
 };
 
 /** ランク判定閾値 */
@@ -712,6 +727,21 @@ export async function addToQueue(data: {
   return entry;
 }
 
+export async function updateQueueDetails(
+  id: string,
+  data: Partial<{ adults: number; children: number; seatType: "TABLE" | "COUNTER" | "EITHER" }>
+): Promise<QueueEntry> {
+  const db = await readDatabase();
+  const entry = db.queue.find((q) => q.id === id);
+  if (!entry) throw new Error("順番待ちデータが見つかりません");
+  if (data.adults !== undefined) entry.adults = data.adults;
+  if (data.children !== undefined) entry.children = data.children;
+  if (data.seatType !== undefined) entry.seatType = data.seatType;
+  entry.updatedAt = new Date().toISOString();
+  await persistDatabase();
+  return entry;
+}
+
 export async function updateQueueStatus(
   id: string,
   status: "WAITING" | "CALLED" | "HOLD" | "DONE" | "CANCELLED"
@@ -792,6 +822,16 @@ export async function getQueueHistory(storeId: string): Promise<QueueEntry[]> {
   return db.queue
     .filter((q) => q.storeId === storeId && ["DONE", "CANCELLED"].includes(q.status))
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+}
+
+export async function incrementUserPostpone(id: string): Promise<QueueEntry> {
+  const db = await readDatabase();
+  const entry = db.queue.find((q) => q.id === id);
+  if (!entry) throw new Error("順番待ちデータが見つかりません");
+  entry.userPostponedCount = (entry.userPostponedCount ?? 0) + 1;
+  entry.updatedAt = new Date().toISOString();
+  await persistDatabase();
+  return entry;
 }
 
 export async function restoreQueueEntry(id: string): Promise<QueueEntry> {

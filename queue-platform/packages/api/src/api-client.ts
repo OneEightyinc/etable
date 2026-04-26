@@ -128,6 +128,8 @@ export interface QueueEntryData {
   calledAt?: string;
   createdAt: string;
   updatedAt: string;
+  userPostponedCount?: number;
+  customerId?: string;
 }
 
 export async function getQueue(storeId: string): Promise<QueueEntryData[]> {
@@ -156,6 +158,17 @@ export async function updateQueueStatusApi(
   const result = await request<{ entry: QueueEntryData }>(`/queue/${id}`, {
     method: 'PATCH',
     body: JSON.stringify({ status }),
+  });
+  return result.entry;
+}
+
+export async function updateQueueDetailsApi(
+  id: string,
+  data: Partial<{ adults: number; children: number; seatType: 'TABLE' | 'COUNTER' | 'EITHER' }>
+): Promise<QueueEntryData> {
+  const result = await request<{ entry: QueueEntryData }>(`/queue/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
   });
   return result.entry;
 }

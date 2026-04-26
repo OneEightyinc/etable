@@ -16,6 +16,7 @@ export {
   getQueue,
   addToQueueApi,
   updateQueueStatusApi,
+  updateQueueDetailsApi,
   deleteQueueEntryApi,
   getQueuePosition as getQueuePositionApi,
   getQueueStats as getQueueStatsApi,

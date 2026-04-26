@@ -11,8 +11,10 @@ import type { Restaurant } from "../data/restaurants";
 import type { StorePortalProfile } from "@queue-platform/api/src/server";
 import {
   filterRestaurantsByExploreCategory,
+  filterRestaurantsByWaitTime,
   sortRestaurantsByDistance,
   type ExploreCategoryId,
+  type WaitTimeFilterId,
 } from "../lib/exploreCategories";
 import { useUserLocation, computeDistance } from "../lib/geo";
 
@@ -39,6 +41,7 @@ const Home: React.FC = () => {
   const [portalLoading, setPortalLoading] = useState(false);
   const [portalError, setPortalError] = useState("");
   const [categoryId, setCategoryId] = useState<ExploreCategoryId>("all");
+  const [waitTimeId, setWaitTimeId] = useState<WaitTimeFilterId>("any");
 
   useEffect(() => {
     if (!router.isReady) return;
@@ -78,13 +81,14 @@ const Home: React.FC = () => {
     storeId && portalRestaurant ? [portalRestaurant] : allRestaurants;
 
   const filteredSorted = useMemo(() => {
-    const f = filterRestaurantsByExploreCategory(listToShow, categoryId);
-    const withDist = f.map((r) => ({
+    const byCategory = filterRestaurantsByExploreCategory(listToShow, categoryId);
+    const byWait = filterRestaurantsByWaitTime(byCategory, waitTimeId);
+    const withDist = byWait.map((r) => ({
       ...r,
       distance: computeDistance(r.lat, r.lng, userLoc, r.distance),
     }));
     return sortRestaurantsByDistance(withDist);
-  }, [listToShow, categoryId, userLoc]);
+  }, [listToShow, categoryId, waitTimeId, userLoc]);
 
   const showExploreChrome = !storeId;
 
@@ -96,7 +100,7 @@ const Home: React.FC = () => {
           {showExploreChrome ? (
             <>
               <CategoryFilter value={categoryId} onChange={setCategoryId} />
-              <SearchToggleTabs />
+              <SearchToggleTabs value={waitTimeId} onChange={setWaitTimeId} />
               <SectionHeader title="近くの店舗" highlight={`${filteredSorted.length}件`} sortOption="距離順" />
             </>
           ) : (

@@ -109,9 +109,10 @@ export function pointsProgress(
 /** ポイントアクションの日本語ラベル */
 export function pointActionLabel(action: string): string {
   const labels: Record<string, string> = {
-    FIRST_VISIT: "初回登録＋来店",
-    SURVEY: "アンケート回答",
-    GOOGLE_REVIEW: "Googleレビュー",
+    FIRST_VISIT: "初回会員登録",
+    VISIT: "来店ポイント",
+    SURVEY: "レビュー回答",
+    GOOGLE_REVIEW: "クチコミ投稿で300pt",
     REFERRAL_SENT: "友達招待",
     REFERRAL_RECEIVED: "招待特典",
     IDLE_TIME_BONUS: "アイドルタイムボーナス",

@@ -107,6 +107,23 @@ const ReservationStatusPage: React.FC = () => {
   const [reviewSubmitted, setReviewSubmitted] = useState(false);
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
 
+  // キューステータス追跡（DONE検知でレビュー自動表示）
+  const [queueStatus, setQueueStatus] = useState<string | null>(null);
+  const [doneAt, setDoneAt] = useState<number | null>(null);
+
+  // DONE後60分（またはすぐ）にレビューを自動表示
+  const REVIEW_DELAY_MS = 60 * 60 * 1000; // 60分
+  useEffect(() => {
+    if (!doneAt || showReview || reviewSubmitted) return;
+    const elapsed = Date.now() - doneAt;
+    if (elapsed >= REVIEW_DELAY_MS) {
+      setShowReview(true);
+      return;
+    }
+    const timer = setTimeout(() => setShowReview(true), REVIEW_DELAY_MS - elapsed);
+    return () => clearTimeout(timer);
+  }, [doneAt, showReview, reviewSubmitted]);
+
   const discoveryOptions = [
     { key: "instagram", label: "Instagram" },
     { key: "tiktok", label: "TikTok" },
@@ -137,11 +154,22 @@ const ReservationStatusPage: React.FC = () => {
         const res = await fetch(
           `/api/queue/position?storeId=${encodeURIComponent(restaurantId)}&entryId=${encodeURIComponent(entryId)}`
         );
-        if (!res.ok) return;
-        const data = (await res.json()) as { position: number; estimatedWait: number };
+        if (!res.ok) {
+          // 404 = DONE or CANCELLED — entryがキューから消えた
+          if (res.status === 404 && !cancelled) {
+            setQueueStatus("DONE");
+            if (!doneAt) setDoneAt(Date.now());
+          }
+          return;
+        }
+        const data = (await res.json()) as { entry?: { status: string }; position: number; estimatedWait: number };
         if (cancelled) return;
         setLivePosition(data.position);
         setLiveEstimatedWait(data.estimatedWait);
+        if (data.entry?.status) {
+          setQueueStatus(data.entry.status);
+          if (data.entry.status === "DONE" && !doneAt) setDoneAt(Date.now());
+        }
       } catch {
         /* ignore */
       }
@@ -152,7 +180,7 @@ const ReservationStatusPage: React.FC = () => {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [restaurantId, reservation?.queueEntryId]);
+  }, [restaurantId, reservation?.queueEntryId, doneAt]);
 
   const refreshReservation = () => {
     const list = getReservations().filter(
@@ -180,9 +208,19 @@ const ReservationStatusPage: React.FC = () => {
     router.push("/my-reservations");
   };
 
-  const handleDelay = () => {
+  const handleDelay = async () => {
     if (!reservation) return;
     updateReservationWait(reservation.id, POSTPONE_GROUPS, POSTPONE_MINUTES);
+    // サーバー側にも後回しを通知
+    if (reservation.queueEntryId) {
+      try {
+        await fetch("/api/queue/postpone", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ entryId: reservation.queueEntryId }),
+        });
+      } catch { /* best effort */ }
+    }
     refreshReservation();
     setIsDelayModalOpen(false);
   };
@@ -351,6 +389,16 @@ const ReservationStatusPage: React.FC = () => {
             <p className="text-[64px] font-bold leading-none tracking-tight text-[#ff6b00]">
               {r.ticketNumber}
             </p>
+            {(r.postponedCount ?? 0) > 0 && (
+              <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-[#fff0e6] px-3 py-1.5">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ff6b00" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+                </svg>
+                <span className="text-[12px] font-bold text-[#ff6b00]">
+                  後回し中（{r.postponedCount}回）
+                </span>
+              </div>
+            )}
           </section>
 
           {/* Orange Status Block */}
@@ -389,17 +437,18 @@ const ReservationStatusPage: React.FC = () => {
             <p className="ml-7 text-[14px] text-[#666]">到着後すぐにご案内可能です。</p>
           </section>
 
-          {/* 待機中アンケート */}
+          {/* ② 待機中アンケート（スキップ可・2問のみ） */}
           {!surveyCompleted && (
             <section className="mb-4 rounded-[24px] border border-[#ffe4cc] bg-[#fffaf5] p-5 shadow-[0_4px_12px_rgba(255,107,0,0.08)]">
-              <div className="mb-3 flex items-center justify-between">
-                <h3 className="text-[15px] font-bold text-[#111]">待ち時間アンケート</h3>
+              <div className="mb-2 flex items-center justify-between">
+                <h3 className="text-[15px] font-bold text-[#111]">レビューを作成する</h3>
                 <span className="rounded-full bg-[#ff6b00] px-2.5 py-1 text-[11px] font-bold text-white">+50pt</span>
               </div>
-              <p className="mb-4 text-[12px] text-[#666]">回答するとポイントがもらえます！</p>
+              <p className="mb-4 text-[12px] text-[#999]">2問だけ！回答でポイントGET</p>
 
+              {/* Q1: 何で知ったか（必須） */}
               <div className="mb-4">
-                <p className="mb-2 text-[13px] font-bold text-[#333]">何でこのお店を知りましたか？</p>
+                <p className="mb-2 text-[13px] font-bold text-[#333]">このお店を何で知りましたか？</p>
                 <div className="grid grid-cols-3 gap-2">
                   {discoveryOptions.map((opt) => (
                     <button
@@ -418,8 +467,9 @@ const ReservationStatusPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="mb-4">
-                <p className="mb-2 text-[13px] font-bold text-[#333]">食べたいメニューはありますか？（任意）</p>
+              {/* Q2: 食べたいメニュー（任意） */}
+              <div className="mb-5">
+                <p className="mb-2 text-[13px] font-bold text-[#333]">食べたいメニューは？<span className="ml-1 font-normal text-[#999]">任意</span></p>
                 <input
                   type="text"
                   value={wantToEatMenu}
@@ -433,11 +483,18 @@ const ReservationStatusPage: React.FC = () => {
                 type="button"
                 onClick={() => void handleSurveySubmit()}
                 disabled={!discoveryChannel || surveySubmitting}
-                className={`w-full rounded-full py-3.5 text-[15px] font-bold text-white transition-colors ${
+                className={`mb-2 w-full rounded-full py-3.5 text-[15px] font-bold text-white transition-colors ${
                   discoveryChannel && !surveySubmitting ? "bg-[#ff6b00]" : "bg-[#d4d4d8] cursor-not-allowed"
                 }`}
               >
-                {surveySubmitting ? "送信中..." : "回答してポイントをもらう"}
+                {surveySubmitting ? "送信中..." : "回答して +50pt もらう"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setSurveyCompleted(true)}
+                className="w-full py-2 text-center text-[13px] font-medium text-[#999]"
+              >
+                スキップ
               </button>
             </section>
           )}
@@ -448,52 +505,59 @@ const ReservationStatusPage: React.FC = () => {
             </div>
           )}
 
-          {surveyCompleted && !surveyPointMsg && (
+          {surveyCompleted && !surveyPointMsg && discoveryChannel && (
             <div className="mb-4 rounded-[16px] border border-[#e5e5e5] bg-white p-4 text-center text-[14px] font-medium text-[#22c55e]">
-              アンケート回答済み ✓
+              アンケート回答済み
             </div>
           )}
 
-          {/* 食後満足度レビュー（手動表示ボタン or 自動表示） */}
+          {/* ③ 総合評価 + レビュー（案内済み60分後に自動表示 or 手動表示） */}
           {!showReview && !reviewSubmitted && (
             <section className="mb-4">
               <button
                 type="button"
                 onClick={() => setShowReview(true)}
-                className="w-full rounded-[16px] border border-[#e5e5e5] bg-white py-4 text-center text-[14px] font-bold text-[#ff6b00]"
+                className="w-full rounded-[20px] border border-[#ffe4cc] bg-[#fffaf5] py-5 text-center shadow-[0_2px_8px_rgba(255,107,0,0.06)]"
               >
-                お食事はいかがでしたか？レビューを書く
+                <p className="text-[15px] font-bold text-[#111]">お食事はいかがでしたか？</p>
+                <p className="mt-1 text-[12px] text-[#ff6b00]">総合評価 &amp; レビューを書く</p>
               </button>
             </section>
           )}
 
           {showReview && !reviewSubmitted && (
             <section className="mb-4 rounded-[24px] border border-[#ffe4cc] bg-[#fffaf5] p-5 shadow-[0_4px_12px_rgba(255,107,0,0.08)]">
-              <h3 className="mb-2 text-center text-[16px] font-bold text-[#111]">本日のお食事はいかがでしたか？</h3>
-              <p className="mb-4 text-center text-[12px] text-[#666]">タップで評価してください</p>
+              <h3 className="mb-1 text-center text-[16px] font-bold text-[#111]">総合満足度</h3>
+              <p className="mb-5 text-center text-[12px] text-[#999]">タップで評価してください</p>
 
-              {/* 星評価 */}
-              <div className="mb-5 flex justify-center gap-2">
+              {/* 星評価（SVG） */}
+              <div className="mb-5 flex justify-center gap-3">
                 {[1, 2, 3, 4, 5].map((star) => (
                   <button
                     key={star}
                     type="button"
                     onClick={() => setReviewRating(star)}
-                    className="text-[36px] transition-transform active:scale-110"
+                    className="transition-transform active:scale-110"
                   >
-                    {star <= reviewRating ? "⭐" : "☆"}
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill={star <= reviewRating ? "#FFB800" : "#e5e5e5"}>
+                      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                    </svg>
                   </button>
                 ))}
               </div>
 
-              {/* 星1-3: 内部フィードバック */}
+              {/* 星1-3: 内部フィードバック（Googleレビューには流さない） */}
               {reviewRating >= 1 && reviewRating <= 3 && (
                 <div className="mb-4">
-                  <p className="mb-2 text-[13px] font-bold text-[#333]">改善のご要望をお聞かせください</p>
+                  <div className="mb-4 rounded-xl bg-[#fef2f2] px-4 py-3">
+                    <p className="text-[13px] leading-relaxed text-[#666]">
+                      この度はご期待に添えず申し訳ありません。よろしければ、改善のために具体的な理由をお聞かせください。
+                    </p>
+                  </div>
                   <textarea
                     value={reviewFeedback}
                     onChange={(e) => setReviewFeedback(e.target.value)}
-                    placeholder="ご意見をお聞かせください..."
+                    placeholder="改善してほしい点をお聞かせください..."
                     rows={3}
                     className="w-full rounded-xl border border-[#e5e5e5] px-4 py-3 text-[14px] outline-none placeholder:text-[#ccc] focus:border-[#ff6b00]"
                   />
@@ -508,24 +572,40 @@ const ReservationStatusPage: React.FC = () => {
                 </div>
               )}
 
-              {/* 星4-5: Googleレビュー誘導 */}
+              {/* 星4-5: Googleレビュー誘導 + ポイント付与 */}
               {reviewRating >= 4 && (
-                <div className="mb-4 text-center">
-                  <p className="mb-3 text-[14px] font-bold text-[#22c55e]">ありがとうございます！</p>
-                  <p className="mb-4 text-[13px] text-[#666]">Googleレビューを書くと<span className="font-bold text-[#ff6b00]">+300pt</span>プレゼント！</p>
+                <div className="text-center">
+                  <div className="mb-4 rounded-xl bg-[#f0fdf4] px-4 py-3">
+                    <p className="text-[13px] leading-relaxed text-[#666]">
+                      ご来店ありがとうございました！気に入っていただけたようで嬉しいです。ご意見をいただいた方には次回ご利用特典もご用意しています🎁
+                    </p>
+                  </div>
                   <button
                     type="button"
                     onClick={() => void handleGoogleReview()}
-                    className="mb-3 w-full rounded-full bg-[#ff6b00] py-3.5 text-[15px] font-bold text-white shadow-[0_4px_12px_rgba(255,107,0,0.3)]"
+                    className="mb-2 w-full rounded-full bg-[#ff6b00] py-3.5 text-[15px] font-bold text-white shadow-[0_4px_12px_rgba(255,107,0,0.3)]"
                   >
                     Googleレビューを書く（+300pt）
                   </button>
+
+                  {/* ETABLEレビュー自由記述 */}
+                  <div className="mt-4 text-left">
+                    <p className="mb-2 text-[13px] font-bold text-[#333]">ETABLEレビューを書く<span className="ml-1 font-normal text-[#999]">任意</span></p>
+                    <textarea
+                      value={reviewFeedback}
+                      onChange={(e) => setReviewFeedback(e.target.value)}
+                      placeholder="お食事の感想をお聞かせください..."
+                      rows={2}
+                      className="w-full rounded-xl border border-[#e5e5e5] px-4 py-3 text-[14px] outline-none placeholder:text-[#ccc] focus:border-[#ff6b00]"
+                    />
+                  </div>
+
                   <button
                     type="button"
                     onClick={() => void handleReviewSubmit()}
-                    className="w-full rounded-full border border-[#e5e5e5] bg-white py-3 text-[13px] font-medium text-[#999]"
+                    className="mt-3 w-full rounded-full border border-[#e5e5e5] bg-white py-3 text-[13px] font-medium text-[#666]"
                   >
-                    スキップ
+                    {reviewFeedback.trim() ? "レビューを送信して完了" : "スキップ"}
                   </button>
                 </div>
               )}
@@ -533,8 +613,8 @@ const ReservationStatusPage: React.FC = () => {
           )}
 
           {reviewSubmitted && (
-            <div className="mb-4 rounded-[16px] border border-[#e5e5e5] bg-white p-4 text-center text-[14px] font-medium text-[#22c55e]">
-              レビューありがとうございました ✓
+            <div className="mb-4 rounded-[16px] bg-[#f0fdf4] border border-[#bbf7d0] p-4 text-center text-[14px] font-medium text-[#22c55e]">
+              レビューありがとうございました
             </div>
           )}
 

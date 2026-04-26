@@ -6,6 +6,7 @@ import GlassModal from './GlassModal';
 import {
   getQueue,
   updateQueueStatusApi,
+  updateQueueDetailsApi,
   deleteQueueEntryApi,
   addToQueueApi,
   type QueueEntryData,
@@ -15,7 +16,7 @@ import { useStoreAdminPublicToken } from '../lib/StoreAdminPublicTokenContext';
 import { clearStoreAdminSession } from '../lib/storeAdminSession';
 
 /* ─── helpers ─── */
-type FilterTab = 'all' | 'hold-postpone' | 'table' | 'counter';
+type FilterTab = 'all' | 'hold' | 'table' | 'counter';
 
 /** 後回し管理: guestId → 何組後に復帰するか（残りカウント） */
 type PostponeMap = Record<string, number>;
@@ -106,7 +107,7 @@ const StoreView: React.FC<{ storeId?: string; onLogout?: () => void }> = ({
   /* modals */
 
   const [confirmModal, setConfirmModal] = useState<{
-    isOpen: boolean; targetId: string | null; type: 'CANCEL' | 'HOLD';
+    isOpen: boolean; targetId: string | null; type: 'CANCEL' | 'HOLD' | 'POSTPONE';
   }>({ isOpen: false, targetId: null, type: 'CANCEL' });
 
   const [showAddForm, setShowAddForm] = useState(false);
@@ -114,6 +115,15 @@ const StoreView: React.FC<{ storeId?: string; onLogout?: () => void }> = ({
   const [isAdding, setIsAdding] = useState(false);
   const [guidingSinceById, setGuidingSinceById] = useState<Record<string, string>>({});
   const [postponeMap, setPostponeMap] = useState<PostponeMap>({});
+  /** 呼び出し通知方法の記録 */
+  const [calledMethodById, setCalledMethodById] = useState<Record<string, 'line' | 'sms' | 'both' | 'none'>>({});
+
+  /* 人数・席種変更モーダル */
+  const [editModal, setEditModal] = useState<{ isOpen: boolean; guest: QueueEntryData | null }>({ isOpen: false, guest: null });
+  const [editForm, setEditForm] = useState({ adults: 1, children: 0, seatType: 'TABLE' as 'TABLE' | 'COUNTER' | 'EITHER' });
+
+  /* 呼び出し通知選択モーダル */
+  const [callModal, setCallModal] = useState<{ isOpen: boolean; guest: QueueEntryData | null }>({ isOpen: false, guest: null });
 
   /* timer（呼び出し・案内の経過表示用に1秒） */
   useEffect(() => {
@@ -157,7 +167,7 @@ const StoreView: React.FC<{ storeId?: string; onLogout?: () => void }> = ({
   const nonHoldGuests = activeGuests.filter(c => c.status !== 'HOLD');
 
   const filteredGuests = (() => {
-    if (filterTab === 'hold-postpone') return holdGuests;
+    if (filterTab === 'hold') return holdGuests;
     return nonHoldGuests.filter(c => {
       if (filterTab === 'table') return c.seatType === 'TABLE';
       if (filterTab === 'counter') return c.seatType === 'COUNTER';
@@ -218,9 +228,9 @@ const StoreView: React.FC<{ storeId?: string; onLogout?: () => void }> = ({
     try { await deleteQueueEntryApi(id); } catch (e: any) { setError(e.message); }
   };
 
-  const handleCallNext = async () => {
+  const handleCallNext = () => {
     const next = waitingGuests[0];
-    if (next) await handleUnifiedCall(next);
+    if (next) openCallModal(next);
   };
 
   const handleAddToQueue = async (e: React.FormEvent) => {
@@ -234,13 +244,30 @@ const StoreView: React.FC<{ storeId?: string; onLogout?: () => void }> = ({
     finally { setIsAdding(false); }
   };
 
+  /* 人数変更を保存 */
+  const handleSaveDetails = async () => {
+    if (!editModal.guest) return;
+    try {
+      await updateQueueDetailsApi(editModal.guest.id, { adults: editForm.adults, children: editForm.children, seatType: editForm.seatType });
+      setEditModal({ isOpen: false, guest: null });
+    } catch (e: any) { setError(e.message); }
+  };
+
   /* card menu actions */
   const handleMenuAction = async (action: string, id: string, guest?: QueueEntryData) => {
     setOpenMenuId(null);
     if (action === 'hold') await handleHold(id);
-    if (action === 'postpone') await handlePostpone(id);
+    if (action === 'postpone') {
+      setConfirmModal({ isOpen: true, targetId: id, type: 'POSTPONE' });
+      return;
+    }
     if (action === 'cancel') await handleCancel(id);
     if (action === 'extend') { /* future */ }
+    if (action === 'editDetails' && guest) {
+      setEditForm({ adults: guest.adults, children: guest.children, seatType: guest.seatType });
+      setEditModal({ isOpen: true, guest });
+      return;
+    }
     if (action === 'phone' && guest?.phone) {
       window.location.href = `tel:${guest.phone}`;
     }
@@ -299,9 +326,36 @@ const StoreView: React.FC<{ storeId?: string; onLogout?: () => void }> = ({
     return "border-l-[6px] border-l-[#082752] bg-white";
   };
 
-  /** 統合呼び出し: LINE/メールはシステムが自動判別 */
-  const handleUnifiedCall = async (guest: QueueEntryData) => {
-    try { await handleCall(guest.id); } catch {}
+  /** 呼び出しモーダルを開く */
+  const openCallModal = (guest: QueueEntryData) => {
+    setCallModal({ isOpen: true, guest });
+  };
+
+  /** 通知して呼び出し実行 */
+  const handleCallWithNotify = async () => {
+    if (!callModal.guest) return;
+    const g = callModal.guest;
+    const isMember = !!g.customerId;
+
+    let method: 'line' | 'sms' | 'both' | 'none' = 'sms';
+    if (isMember) method = 'both';
+
+    try {
+      await handleCall(g.id);
+      setCalledMethodById((prev) => ({ ...prev, [g.id]: method }));
+      // TODO: method に応じた通知送信（LINE API / SMS API）
+    } catch {}
+    setCallModal({ isOpen: false, guest: null });
+  };
+
+  /** 通知なしで呼び出し */
+  const handleCallWithoutNotify = async () => {
+    if (!callModal.guest) return;
+    try {
+      await handleCall(callModal.guest.id);
+      setCalledMethodById((prev) => ({ ...prev, [callModal.guest!.id]: 'none' }));
+    } catch {}
+    setCallModal({ isOpen: false, guest: null });
   };
 
   const actionButton = (guest: QueueEntryData) => {
@@ -349,9 +403,9 @@ const StoreView: React.FC<{ storeId?: string; onLogout?: () => void }> = ({
         </button>
       );
     }
-    // WAITING: 統合呼び出しボタン（LINE/メール自動判別）
+    // WAITING: 呼び出し → 通知方法選択モーダルへ
     return (
-      <button onClick={() => handleUnifiedCall(guest)}
+      <button onClick={() => openCallModal(guest)}
         className="h-full w-[120px] flex flex-col items-center justify-center rounded-r-2xl bg-[#082752] text-white transition-colors hover:bg-[#0a3060]">
         <svg className="w-7 h-7 mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
@@ -368,7 +422,8 @@ const StoreView: React.FC<{ storeId?: string; onLogout?: () => void }> = ({
       items.push({ icon: 'phone', label: guest.phone, action: 'phone' });
     }
     if (guest.status === 'WAITING') {
-      items.push({ icon: 'postpone', label: '後回しにする', action: 'postpone' });
+      items.push({ icon: 'postpone', label: '後回しにする（3組後退）', action: 'postpone' });
+      items.push({ icon: 'edit', label: '人数・席種を変更', action: 'editDetails' });
       items.push({ icon: 'x', label: 'キャンセル', action: 'cancel', danger: true });
     }
     if (guest.status === 'CALLED') {
@@ -420,7 +475,7 @@ const StoreView: React.FC<{ storeId?: string; onLogout?: () => void }> = ({
       {/* ─── FILTER TABS ─── */}
       <div className="bg-white border-b border-gray-100 pt-2 pb-0 sticky top-0 z-[5]">
         <div className="flex">
-          {([['all','すべて'],['hold-postpone','保留・後回し'],['table','テーブル'],['counter','カウンター']] as [FilterTab,string][]).map(([key, label]) => (
+          {([['all','すべて'],['hold','保留'],['table','テーブル'],['counter','カウンター']] as [FilterTab,string][]).map(([key, label]) => (
             <button key={key} onClick={() => setFilterTab(key)} className={`flex-1 pt-3 pb-4 text-sm font-medium transition-colors relative ${filterTab === key ? 'text-[#FD780F]' : 'text-gray-500 hover:text-gray-700'}`}>
               {label}
               {filterTab === key && <div className="absolute bottom-0 left-1/4 right-1/4 h-1 bg-[#FD780F] rounded-full" />}
@@ -456,10 +511,19 @@ const StoreView: React.FC<{ storeId?: string; onLogout?: () => void }> = ({
                   <div className="mb-2 flex items-center gap-3">
                     <span className="text-[24px] font-bold text-[#082752]">No.{guest.ticketNumber}</span>
                     {statusBadge(guest)}
-                    {/* 後回し残りカウント表示 */}
+                    {/* 後回し残りカウント表示（店舗操作） */}
                     {postponeMap[guest.id] && (
                       <span className="rounded bg-[#FFF7ED] px-2 py-0.5 text-[10px] font-bold text-[#FD780F]">
                         ↩️ あと{postponeMap[guest.id]}組
+                      </span>
+                    )}
+                    {/* ユーザー主導の後回し（WAITING状態のまま・対応不要） */}
+                    {(guest.userPostponedCount ?? 0) > 0 && (
+                      <span className="flex items-center gap-1 rounded bg-[#EFF6FF] px-2 py-0.5 text-[10px] font-bold text-[#2563EB]">
+                        <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+                        </svg>
+                        後回し中
                       </span>
                     )}
                     {/* 保留ボタン（No.プレート内） */}
@@ -495,6 +559,9 @@ const StoreView: React.FC<{ storeId?: string; onLogout?: () => void }> = ({
                                 )}
                                 {item.icon === 'timer' && (
                                   <svg className="w-5 h-5 text-gray-900" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 2h4" /><path d="M12 14v-4" /><path d="M4 13a8 8 0 108-8" /></svg>
+                                )}
+                                {item.icon === 'edit' && (
+                                  <svg className="w-5 h-5 text-gray-900" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
                                 )}
                                 {item.icon === 'x' && (
                                   <svg className={`w-5 h-5 ${item.danger ? 'text-[#EF4444]' : 'text-gray-900'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18" /><path d="M6 6l12 12" /></svg>
@@ -538,6 +605,23 @@ const StoreView: React.FC<{ storeId?: string; onLogout?: () => void }> = ({
                           呼び出しから {formatElapsedSince(guest.calledAt, now)}
                         </span>
                       </span>
+                      {/* 通知方法アイコン */}
+                      {calledMethodById[guest.id] && calledMethodById[guest.id] !== 'none' && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 border border-gray-200">
+                          {(calledMethodById[guest.id] === 'line' || calledMethodById[guest.id] === 'both') && (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="#06C755"><path d="M12 2C6.48 2 2 5.82 2 10.5c0 2.93 1.93 5.52 4.86 7.17-.18.64-.67 2.38-.77 2.74-.12.46.17.45.36.33.15-.1 2.4-1.63 3.38-2.3.7.1 1.43.16 2.17.16 5.52 0 10-3.82 10-8.5S17.52 2 12 2z" /></svg>
+                          )}
+                          {(calledMethodById[guest.id] === 'sms' || calledMethodById[guest.id] === 'both') && (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" /></svg>
+                          )}
+                        </span>
+                      )}
+                      {calledMethodById[guest.id] === 'none' && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-[9px] font-medium text-gray-400">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" /></svg>
+                          店内
+                        </span>
+                      )}
                     </div>
                   )}
                   {guest.status === "CALLED" && guidingSinceById[guest.id] && (
@@ -565,12 +649,12 @@ const StoreView: React.FC<{ storeId?: string; onLogout?: () => void }> = ({
       </div>
 
       {/* ─── HOLD SECTION (すべてタブ時のみ小さく表示) ─── */}
-      {holdGuests.length > 0 && filterTab !== 'hold-postpone' && (
+      {holdGuests.length > 0 && filterTab !== 'hold' && (
         <div className="px-4 py-4 bg-[#F5F5F7]">
           <div className="flex items-center gap-3 mb-4">
-            <span className="text-sm text-gray-500 whitespace-nowrap">保留・後回し：{holdGuests.length}名</span>
+            <span className="text-sm text-gray-500 whitespace-nowrap">保留：{holdGuests.length}名</span>
             <div className="flex-1 h-px bg-gray-200" />
-            <button onClick={() => setFilterTab('hold-postpone')} className="text-xs text-[#FD780F] font-medium">すべて表示</button>
+            <button onClick={() => setFilterTab('hold')} className="text-xs text-[#FD780F] font-medium">すべて表示</button>
           </div>
         </div>
       )}
@@ -774,15 +858,171 @@ const StoreView: React.FC<{ storeId?: string; onLogout?: () => void }> = ({
           onClose={() => setConfirmModal({...confirmModal, isOpen: false})}
           onConfirm={async () => {
             if (confirmModal.type === 'CANCEL') await handleCancel(confirmModal.targetId!);
+            else if (confirmModal.type === 'POSTPONE') await handlePostpone(confirmModal.targetId!);
             else await handleHold(confirmModal.targetId!);
             setConfirmModal({isOpen: false, targetId: null, type: 'CANCEL'});
           }}
-          title={confirmModal.type === 'CANCEL' ? '受付をキャンセルしますか？' : '保留にしますか？'}
-          message={confirmModal.type === 'CANCEL' ? 'この操作は取り消せません。' : 'お客様を一時的に保留リストに移動します。'}
-          confirmText={confirmModal.type === 'CANCEL' ? 'キャンセルを確定' : '保留にする'}
+          title={
+            confirmModal.type === 'CANCEL' ? '受付をキャンセルしますか？'
+            : confirmModal.type === 'POSTPONE' ? '後回しにしますか？'
+            : '保留にしますか？'
+          }
+          message={
+            confirmModal.type === 'CANCEL' ? 'この操作は取り消せません。'
+            : confirmModal.type === 'POSTPONE' ? '3組分後ろに順番を移動します。'
+            : 'お客様を一時的に保留リストに移動します。'
+          }
+          confirmText={
+            confirmModal.type === 'CANCEL' ? 'キャンセルを確定'
+            : confirmModal.type === 'POSTPONE' ? '後回しにする'
+            : '保留にする'
+          }
           isDangerous={confirmModal.type === 'CANCEL'}
         />
       )}
+
+      {/* ─── EDIT DETAILS MODAL ─── */}
+      {editModal.isOpen && editModal.guest && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm" onClick={() => setEditModal({ isOpen: false, guest: null })}>
+          <div className="w-full max-w-md rounded-t-3xl bg-white px-6 pb-8 pt-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-gray-300" />
+            <h3 className="mb-5 text-center text-[17px] font-bold text-[#082752]">
+              No.{editModal.guest.ticketNumber} 人数・席種を変更
+            </h3>
+
+            {/* 大人 */}
+            <div className="mb-4 flex items-center justify-between">
+              <span className="text-[14px] font-medium text-[#333]">大人</span>
+              <div className="flex items-center gap-4">
+                <button type="button" onClick={() => setEditForm((f) => ({ ...f, adults: Math.max(1, f.adults - 1) }))}
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-gray-300 text-gray-500">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                </button>
+                <span className="w-8 text-center text-[20px] font-bold text-[#082752]">{editForm.adults}</span>
+                <button type="button" onClick={() => setEditForm((f) => ({ ...f, adults: Math.min(10, f.adults + 1) }))}
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-gray-300 text-gray-500">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                </button>
+              </div>
+            </div>
+
+            {/* 子供 */}
+            <div className="mb-4 flex items-center justify-between">
+              <span className="text-[14px] font-medium text-[#333]">子供</span>
+              <div className="flex items-center gap-4">
+                <button type="button" onClick={() => setEditForm((f) => ({ ...f, children: Math.max(0, f.children - 1) }))}
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-gray-300 text-gray-500">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                </button>
+                <span className="w-8 text-center text-[20px] font-bold text-[#082752]">{editForm.children}</span>
+                <button type="button" onClick={() => setEditForm((f) => ({ ...f, children: Math.min(10, f.children + 1) }))}
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-gray-300 text-gray-500">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                </button>
+              </div>
+            </div>
+
+            {/* 席種 */}
+            <div className="mb-6">
+              <span className="mb-2 block text-[14px] font-medium text-[#333]">席種</span>
+              <div className="grid grid-cols-3 gap-2">
+                {(['TABLE', 'COUNTER', 'EITHER'] as const).map((st) => (
+                  <button key={st} type="button" onClick={() => setEditForm((f) => ({ ...f, seatType: st }))}
+                    className={`rounded-xl border py-2.5 text-[13px] font-semibold transition-colors ${editForm.seatType === st ? 'border-[#FD780F] bg-[#FFF7ED] text-[#FD780F]' : 'border-gray-200 bg-white text-gray-500'}`}>
+                    {getSeatLabel(st)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* ボタン */}
+            <div className="flex gap-3">
+              <button type="button" onClick={() => setEditModal({ isOpen: false, guest: null })}
+                className="flex-1 rounded-2xl border border-gray-200 py-3.5 text-[14px] font-bold text-gray-500">
+                キャンセル
+              </button>
+              <button type="button" onClick={() => void handleSaveDetails()}
+                className="flex-1 rounded-2xl bg-[#FD780F] py-3.5 text-[14px] font-bold text-white shadow-lg">
+                変更を保存
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── CALL NOTIFICATION MODAL ─── */}
+      {callModal.isOpen && callModal.guest && (() => {
+        const g = callModal.guest;
+        const isMember = !!g.customerId;
+        // SMS は kiosk で電話番号を登録するため常にアクティブ
+        const targets: string[] = ['SMS'];
+        if (isMember) targets.push('LINE');
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setCallModal({ isOpen: false, guest: null })}>
+            <div className="mx-4 w-full max-w-sm rounded-3xl bg-white px-6 pb-6 pt-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <h3 className="mb-1 text-center text-[17px] font-bold text-[#082752]">
+                No.{g.ticketNumber} を呼び出し
+              </h3>
+              <p className="mb-5 text-center text-[13px] text-gray-400">
+                {g.adults + g.children}名 · {getSeatLabel(g.seatType)}
+              </p>
+
+              <p className="mb-3 text-[13px] font-bold text-[#333]">通知先</p>
+
+              <div className="space-y-2 mb-5">
+                {/* LINE */}
+                <div className={`flex items-center gap-3 rounded-2xl border-2 px-4 py-3 ${isMember ? 'border-[#06C755] bg-[#06C755]/5' : 'border-gray-200 bg-gray-50 opacity-40'}`}>
+                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${isMember ? 'bg-[#06C755]' : 'bg-gray-300'}`}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+                      <path d="M12 2C6.48 2 2 5.82 2 10.5c0 2.93 1.93 5.52 4.86 7.17-.18.64-.67 2.38-.77 2.74-.12.46.17.45.36.33.15-.1 2.4-1.63 3.38-2.3.7.1 1.43.16 2.17.16 5.52 0 10-3.82 10-8.5S17.52 2 12 2z" />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <p className={`text-[14px] font-bold ${isMember ? 'text-[#06C755]' : 'text-gray-400'}`}>LINE</p>
+                    <p className="text-[11px] text-gray-400">{isMember ? '会員 — 送信します' : '非会員 — 連携なし'}</p>
+                  </div>
+                  {isMember ? (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#06C755" strokeWidth="3"><path d="M20 6L9 17l-5-5" /></svg>
+                  ) : (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12" /></svg>
+                  )}
+                </div>
+
+                {/* SMS（常にアクティブ） */}
+                <div className="flex items-center gap-3 rounded-2xl border-2 border-[#3B82F6] bg-[#3B82F6]/5 px-4 py-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#3B82F6]">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-[14px] font-bold text-[#3B82F6]">SMS</p>
+                    <p className="text-[11px] text-gray-400">{g.phone}</p>
+                  </div>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" strokeWidth="3"><path d="M20 6L9 17l-5-5" /></svg>
+                </div>
+              </div>
+
+              {/* 通知するボタン */}
+              <button
+                type="button"
+                onClick={() => void handleCallWithNotify()}
+                className="w-full rounded-2xl bg-[#FD780F] py-4 text-[15px] font-bold text-white shadow-lg transition-colors hover:bg-[#e46a0a]"
+              >
+                通知する（{targets.join(' + ')}）
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setCallModal({ isOpen: false, guest: null })}
+                className="mt-3 w-full py-2 text-center text-[13px] text-gray-400"
+              >
+                キャンセル
+              </button>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };

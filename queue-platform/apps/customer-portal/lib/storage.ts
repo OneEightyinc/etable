@@ -15,6 +15,8 @@ export interface ReservationItem {
   baselineQueuePosition?: number;
   /** 登録直後の目安待ち（分）基準 */
   baselineWaitMinutes?: number;
+  /** 後回しにした回数 */
+  postponedCount?: number;
 }
 
 export interface FavoriteItem {
@@ -80,7 +82,7 @@ export function updateReservationWait(id: string, addGroups: number, addMinutes:
   const current = getReservations();
   const updated = current.map((r) =>
     r.id === id
-      ? { ...r, waitingGroups: r.waitingGroups + addGroups, waitMinutes: r.waitMinutes + addMinutes }
+      ? { ...r, waitingGroups: r.waitingGroups + addGroups, waitMinutes: r.waitMinutes + addMinutes, postponedCount: (r.postponedCount ?? 0) + 1 }
       : r
   );
   localStorage.setItem(RESERVATIONS_KEY, JSON.stringify(updated));

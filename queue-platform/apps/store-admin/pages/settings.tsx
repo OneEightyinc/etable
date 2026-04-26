@@ -167,6 +167,16 @@ export default function SettingsPage() {
           portalPriceRange,
           portalHoursSummary,
           portalMenuItems: menuPayload,
+          idleTimeBonus: {
+            enabled: idleTimeEnabled,
+            startHour: parseInt(idleTimeStart.split(':')[0] || '15', 10),
+            endHour: parseInt(idleTimeEnd.split(':')[0] || '17', 10),
+            bonusPoints: Math.round((idleTimeMultiplier - 1) * 100),
+            days: idleTimeDays.map((d) => {
+              const m: Record<string, string> = { '月': 'mon', '火': 'tue', '水': 'wed', '木': 'thu', '金': 'fri', '土': 'sat', '日': 'sun' };
+              return m[d] ?? d;
+            }),
+          },
         }),
       });
       if (!res.ok) {

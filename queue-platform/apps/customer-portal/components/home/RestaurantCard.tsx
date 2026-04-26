@@ -35,14 +35,26 @@ const RestaurantCard: React.FC<RestaurantCardProps> = ({ restaurant, onAfterTogg
         <div className="relative h-[144.97px]">
           <div className="absolute left-[15.99px] top-[15.99px] size-[95.995px]">
             <div className="relative size-full">
-              <Image
-                src={restaurant.imageUrl}
-                alt={restaurant.name}
-                width={96}
-                height={120}
-                className="h-[120px] w-[96px] rounded-xl object-cover"
-                unoptimized
-              />
+              {restaurant.imageUrl && !restaurant.imageUrl.includes("picsum.photos") ? (
+                <Image
+                  src={restaurant.imageUrl}
+                  alt={restaurant.name}
+                  width={96}
+                  height={120}
+                  className="h-[120px] w-[96px] rounded-xl object-cover"
+                  unoptimized
+                />
+              ) : (
+                <div className="flex h-[120px] w-[96px] flex-col items-center justify-center gap-1.5 rounded-xl bg-[#f5f5f5]">
+                  <svg width="36" height="36" viewBox="0 0 48 48" fill="none" aria-hidden>
+                    <rect x="6" y="12" width="36" height="24" rx="4" stroke="#ccc" strokeWidth="2" />
+                    <circle cx="18" cy="22" r="3" fill="#ddd" />
+                    <path d="M6 32l10-8 6 5 8-10 12 13" stroke="#ccc" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M20 8c0-1.1.9-2 2-2h4a2 2 0 012 2v4h-8V8z" fill="#e5e5e5" />
+                  </svg>
+                  <span className="text-[10px] font-bold text-[#bbb]">No Image</span>
+                </div>
+              )}
               <WaitingBadge waitingGroups={restaurant.waitingGroups} className="absolute right-[-8px] top-[-8px]" />
             </div>
           </div>

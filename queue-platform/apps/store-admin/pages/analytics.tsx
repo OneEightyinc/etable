@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import SurveyDashboard from "../components/analytics/SurveyDashboard";
+import InsightsDashboard from "../components/analytics/InsightsDashboard";
 import { storeScopedPath } from "../lib/storePaths";
 import { useStoreAdminPublicToken } from "../lib/StoreAdminPublicTokenContext";
 import {
@@ -275,7 +276,12 @@ export default function AnalyticsPage() {
         )}
 
         <div className="mt-8 border-t border-gray-200 pt-8">
-          <h2 className="mb-6 text-lg font-bold text-[#082752]">来店者アンケート</h2>
+          <h2 className="mb-6 text-lg font-bold text-[#082752]">インサイト・レポート</h2>
+          <InsightsDashboard storeId={storeId} />
+        </div>
+
+        <div className="mt-8 border-t border-gray-200 pt-8">
+          <h2 className="mb-6 text-lg font-bold text-[#082752]">詳細アンケート分析</h2>
           <SurveyDashboard storeId={storeId} />
         </div>
       </div>

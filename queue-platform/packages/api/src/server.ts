@@ -25,6 +25,8 @@ export {
   getQueueStats,
   getQueueHistory,
   restoreQueueEntry,
+  incrementUserPostpone,
+  updateQueueDetails,
   getStoreSettings,
   updateStoreSettings,
   getStorePortalProfile,

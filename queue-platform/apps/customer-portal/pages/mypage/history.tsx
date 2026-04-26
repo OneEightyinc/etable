@@ -101,7 +101,7 @@ export default function MypageHistoryPage() {
                             href={`/survey/${encodeURIComponent(row.restaurantId)}`}
                             className="block w-full rounded-full border border-[#ff6b00] py-2.5 text-center text-[13px] font-bold text-[#ff6b00]"
                           >
-                            来店アンケートに回答する
+                            レビューを作成する（+300pt）
                           </Link>
                         </div>
                       </div>

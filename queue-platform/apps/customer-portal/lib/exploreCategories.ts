@@ -15,29 +15,19 @@ export const EXPLORE_CATEGORIES = [
     match: (c: string) => /焼肉|焼き肉|BBQ/.test(c),
   },
   { id: "ramen", label: "ラーメン", icon: "/category-ramen.svg", match: (c: string) => /ラーメン|麺/.test(c) },
-  { id: "cafe", label: "カフェ", icon: "/category-cafe.svg", match: (c: string) => /カフェ|喫茶|コーヒー/.test(c) },
-  {
-    id: "italian",
-    label: "イタリアン",
-    icon: "/category-italian.svg",
-    match: (c: string) => /イタリア|パスタ|ピザ|トラットリア/.test(c),
-  },
-  { id: "chinese", label: "中華", icon: "/category-chanese.svg", match: (c: string) => /中華|四川|広東|餃子/.test(c) },
-  {
-    id: "izakaya",
-    label: "居酒屋",
-    icon: "/category-izakaya.svg",
-    match: (c: string) => /居酒屋|串|酒場/.test(c),
-  },
-  {
-    id: "sweets",
-    label: "スイーツ",
-    icon: "/category-sweets.svg",
-    match: (c: string) => /スイーツ|パティスリー|ケーキ|デザート/.test(c),
-  },
 ] as const;
 
 export type ExploreCategoryId = (typeof EXPLORE_CATEGORIES)[number]["id"];
+
+/** 待ち時間フィルター */
+export const WAIT_TIME_FILTERS = [
+  { id: "any", label: "指定なし", maxMinutes: Infinity },
+  { id: "soon", label: "すぐ案内", sublabel: "0〜10分", maxMinutes: 10 },
+  { id: "within30", label: "30分以内", sublabel: "", maxMinutes: 30 },
+  { id: "within60", label: "60分以内", sublabel: "", maxMinutes: 60 },
+] as const;
+
+export type WaitTimeFilterId = (typeof WAIT_TIME_FILTERS)[number]["id"];
 
 export function filterRestaurantsByExploreCategory<T extends { category: string }>(
   list: T[],
@@ -46,6 +36,15 @@ export function filterRestaurantsByExploreCategory<T extends { category: string 
   const def = EXPLORE_CATEGORIES.find((c) => c.id === categoryId);
   if (!def || def.id === "all") return list;
   return list.filter((r) => def.match(r.category || ""));
+}
+
+export function filterRestaurantsByWaitTime<T extends { shortestWaitMinutes: number }>(
+  list: T[],
+  waitTimeId: WaitTimeFilterId
+): T[] {
+  const def = WAIT_TIME_FILTERS.find((w) => w.id === waitTimeId);
+  if (!def || def.id === "any") return list;
+  return list.filter((r) => r.shortestWaitMinutes <= def.maxMinutes);
 }
 
 export function sortRestaurantsByDistance<T extends { distance: string }>(list: T[]): T[] {

@@ -49,9 +49,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const desc =
         description ??
         ({
-          FIRST_VISIT: "初回登録＋来店ボーナス",
-          SURVEY: "待機中アンケート回答",
-          GOOGLE_REVIEW: "Googleレビュー投稿",
+          FIRST_VISIT: "初回会員登録ボーナス",
+          VISIT: "来店ポイント",
+          SURVEY: "レビュー回答ボーナス",
+          GOOGLE_REVIEW: "クチコミ投稿で300pt",
           REFERRAL_SENT: "友達招待ボーナス",
           REFERRAL_RECEIVED: "招待された特典",
           IDLE_TIME_BONUS: "アイドルタイムボーナス",

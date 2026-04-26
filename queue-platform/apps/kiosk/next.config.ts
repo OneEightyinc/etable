@@ -1,9 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  basePath: process.env.VERCEL ? "/kiosk" : "",
   env: {
-    NEXT_PUBLIC_API_PREFIX: "/kiosk",
+    NEXT_PUBLIC_API_PREFIX: "",
   },
   transpilePackages: ["@queue-platform/api"],
   async redirects() {

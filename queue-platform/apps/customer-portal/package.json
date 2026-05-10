@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
+    "@line/liff": "^2.28.0",
     "@queue-platform/api": "*",
     "@upstash/redis": "^1.37.0",
     "next": "16.1.6",

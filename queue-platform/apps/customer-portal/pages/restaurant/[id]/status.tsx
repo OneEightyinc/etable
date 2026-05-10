@@ -232,8 +232,22 @@ const ReservationStatusPage: React.FC = () => {
   };
 
   const handleConnectLine = () => {
+    if (!reservation?.queueEntryId) {
+      setIsLineModalOpen(false);
+      return;
+    }
+    const liffId = process.env.NEXT_PUBLIC_LIFF_ID;
+    if (!liffId) {
+      // ENV 未設定時はフォールバックで状態だけ切り替え（dev 用途）
+      setNotificationMethod("LINE");
+      setIsLineModalOpen(false);
+      return;
+    }
+    // LIFF アプリを起動 → /line/link で LINE userId を queue entry に紐付け
+    const liffUrl = `https://liff.line.me/${liffId}?entryId=${encodeURIComponent(reservation.queueEntryId)}`;
     setNotificationMethod("LINE");
     setIsLineModalOpen(false);
+    window.location.href = liffUrl;
   };
 
   const handleSurveySubmit = async () => {

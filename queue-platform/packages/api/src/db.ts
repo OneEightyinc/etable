@@ -7,6 +7,7 @@ import path from "path";
 import crypto from "crypto";
 import { Redis } from "@upstash/redis";
 import { waitingIndexForEntry, waitingLineEntries } from "./queue-waiting-line";
+import { pushLineMessage, formatCallMessage } from "./line";
 
 // ─── Types ───────────────────────────────────────────────
 export interface AdminUser {
@@ -48,8 +49,22 @@ export interface QueueEntry {
   calledAt?: string;
   createdAt: string;
   updatedAt: string;
-  /** ユーザーが後回しにした回数 */
+  /** ユーザーが後回しにした回数（累積） */
   userPostponedCount?: number;
+  /** 後回し中: 自分の前に通常待ちが何組消化されたら通常待機に戻るか（残り組数）。 */
+  postponeRemainingSlots?: number;
+  /** 何度呼び出したか。0=未呼び出し / 1=初回呼び出し済み / 2=再呼び出し済み（次回の不在で自動キャンセル）。 */
+  recallCount?: number;
+  /** HOLD 状態の理由。現状は不在検知のみ。 */
+  holdReason?: "NO_SHOW";
+  /** 通知用メールアドレス（ゲスト時の入力 or プロファイルから denormalize） */
+  email?: string;
+  /** LINE 連携済み顧客の userId（LIFF 経由で取得） */
+  lineUserId?: string;
+  /** LINE で通知を受け取る設定 */
+  notificationLine?: boolean;
+  /** メールで通知を受け取る設定 */
+  notificationEmail?: boolean;
   /** 会員顧客ID（ポイント付与用） */
   customerId?: string;
 }
@@ -71,6 +86,8 @@ export interface StoreSettings {
   isTodayException: boolean;
   callMessage: string;
   autoCancelMinutes: number;
+  /** ユーザーが「後回しにする」を選んだ際の既定スロット数。範囲 2〜5。 */
+  defaultPostponeSlots: number;
   updatedAt: string;
   /** 顧客ポータル表示名（空ならアカウントの店舗名） */
   portalDisplayName: string;
@@ -96,6 +113,8 @@ export interface StoreSettings {
     bonusPoints: number; // e.g. 100 (通常来店100pt + bonus 100pt = 合計200pt)
     days: string[];      // e.g. ["mon","tue","wed","thu","fri"]
   };
+  /** 「1〜2 名」タブを店舗ビューに追加表示するか（小人数の素早い案内動線用） */
+  showSmallPartyTab?: boolean;
 }
 
 /** 顧客ポータル会員（DB 永続化） */
@@ -680,6 +699,18 @@ function bumpTicketNumber(db: Database, storeId: string): number {
 }
 
 // ─── Queue Management ────────────────────────────────────
+/** 呼び出し→未応答の自動遷移閾値のデフォルト（分）。storeSettings.autoCancelMinutes が未設定/不正の場合に使用。 */
+const DEFAULT_CALLOUT_TIMEOUT_MIN = 5;
+
+/** db スナップショットから storeId のキャンセル猶予時間（ミリ秒）を返す。 */
+function getCalloutTimeoutMs(db: Database, storeId: string): number {
+  const s = db.storeSettings?.find((x) => x.storeId === storeId);
+  const min = typeof s?.autoCancelMinutes === "number" && s.autoCancelMinutes > 0
+    ? s.autoCancelMinutes
+    : DEFAULT_CALLOUT_TIMEOUT_MIN;
+  return min * 60 * 1000;
+}
+
 function getActiveQueueForStore(db: Database, storeId: string): QueueEntry[] {
   const q = db.queue ?? [];
   return q
@@ -687,8 +718,38 @@ function getActiveQueueForStore(db: Database, storeId: string): QueueEntry[] {
     .sort((a, b) => new Date(a.arrivalTime).getTime() - new Date(b.arrivalTime).getTime());
 }
 
+/**
+ * CALLED 状態のエントリのうち、calledAt から CALLOUT_TIMEOUT_MS 以上経過したものを
+ * 自動で HOLD（1 回目）or CANCELLED（2 回目以降）に遷移させる。
+ * getQueueByStore の冒頭で呼び、polling されるたびに自然に整合する設計。
+ */
+function processStaleCalloutsInDb(db: Database, storeId: string): boolean {
+  const now = Date.now();
+  const timeoutMs = getCalloutTimeoutMs(db, storeId);
+  let changed = false;
+  for (const e of db.queue) {
+    if (e.storeId !== storeId) continue;
+    if (e.status !== "CALLED") continue;
+    if (!e.calledAt) continue;
+    const elapsed = now - new Date(e.calledAt).getTime();
+    if (elapsed < timeoutMs) continue;
+    if ((e.recallCount ?? 0) >= 2) {
+      e.status = "CANCELLED";
+    } else {
+      e.status = "HOLD";
+      e.holdReason = "NO_SHOW";
+    }
+    e.updatedAt = new Date().toISOString();
+    changed = true;
+  }
+  return changed;
+}
+
 export async function getQueueByStore(storeId: string): Promise<QueueEntry[]> {
   const db = await readDatabase();
+  if (processStaleCalloutsInDb(db, storeId)) {
+    await persistDatabase();
+  }
   return getActiveQueueForStore(db, storeId);
 }
 
@@ -749,11 +810,107 @@ export async function updateQueueStatus(
   const db = await readDatabase();
   const entry = db.queue.find((q) => q.id === id);
   if (!entry) throw new Error("順番待ちデータが見つかりません");
+  const prevStatus = entry.status;
   entry.status = status;
   entry.updatedAt = new Date().toISOString();
   if (status === "CALLED") {
     entry.calledAt = new Date().toISOString();
+    entry.recallCount = (entry.recallCount ?? 0) + 1;
+    // 呼び出した時点で HOLD 由来の再呼び出しなら holdReason を消す
+    entry.holdReason = undefined;
   }
+  if (status === "DONE" && prevStatus !== "DONE") {
+    // 1組案内完了 → 同店舗の後回し中エントリの待機残スロットを 1 減らす
+    consumePostponeSlotsInDb(db, entry.storeId);
+  }
+  if (status === "WAITING" && prevStatus !== "WAITING") {
+    // 通常待機に戻ったので保留理由をクリア
+    entry.holdReason = undefined;
+  }
+  await persistDatabase();
+
+  // CALLED 遷移時に LINE 通知を best-effort で発火（push 失敗はログだけ残す）
+  if (status === "CALLED" && entry.notificationLine && entry.lineUserId) {
+    const settings = db.storeSettings?.find((s) => s.storeId === entry.storeId);
+    const template = settings?.callMessage ?? "";
+    const text = formatCallMessage(template, entry.ticketNumber);
+    void pushLineMessage(entry.lineUserId, [{ type: "text", text }]);
+  }
+
+  return entry;
+}
+
+/** 同一店舗の後回し中エントリの postponeRemainingSlots を 1 つずつ減らし、0 になったらフィールドを削除する。 */
+function consumePostponeSlotsInDb(db: Database, storeId: string): void {
+  for (const e of db.queue) {
+    if (
+      e.storeId === storeId &&
+      e.status === "WAITING" &&
+      typeof e.postponeRemainingSlots === "number" &&
+      e.postponeRemainingSlots > 0
+    ) {
+      e.postponeRemainingSlots -= 1;
+      if (e.postponeRemainingSlots <= 0) {
+        e.postponeRemainingSlots = undefined;
+      }
+      e.updatedAt = new Date().toISOString();
+    }
+  }
+}
+
+/** ユーザー主導の後回し: status は WAITING のまま、3 組ぶん自分の前に消化されるまで番が回ってこない状態にする。 */
+export async function userPostponeQueueEntry(id: string, slots = 3): Promise<QueueEntry> {
+  const db = await readDatabase();
+  const entry = db.queue.find((q) => q.id === id);
+  if (!entry) throw new Error("順番待ちデータが見つかりません");
+  entry.status = "WAITING";
+  entry.holdReason = undefined;
+  entry.postponeRemainingSlots = slots;
+  entry.userPostponedCount = (entry.userPostponedCount ?? 0) + 1;
+  entry.updatedAt = new Date().toISOString();
+  await persistDatabase();
+  return entry;
+}
+
+/** 不在検知 → 保留状態に遷移。HOLD は店舗主導の不在対応のみで使う。 */
+export async function markNoShowHold(id: string): Promise<QueueEntry> {
+  const db = await readDatabase();
+  const entry = db.queue.find((q) => q.id === id);
+  if (!entry) throw new Error("順番待ちデータが見つかりません");
+  entry.status = "HOLD";
+  entry.holdReason = "NO_SHOW";
+  entry.updatedAt = new Date().toISOString();
+  await persistDatabase();
+  return entry;
+}
+
+/** LINE 連携: queue entry に lineUserId を保存し、LINE 通知を有効化する。 */
+export async function linkLineUserToQueueEntry(
+  id: string,
+  lineUserId: string
+): Promise<QueueEntry> {
+  const db = await readDatabase();
+  const entry = db.queue.find((q) => q.id === id);
+  if (!entry) throw new Error("順番待ちデータが見つかりません");
+  entry.lineUserId = lineUserId;
+  entry.notificationLine = true;
+  entry.updatedAt = new Date().toISOString();
+  await persistDatabase();
+  return entry;
+}
+
+/** 通知設定の更新（メール登録など）。 */
+export async function setQueueNotificationPreferences(
+  id: string,
+  prefs: Partial<Pick<QueueEntry, "email" | "notificationEmail" | "notificationLine">>
+): Promise<QueueEntry> {
+  const db = await readDatabase();
+  const entry = db.queue.find((q) => q.id === id);
+  if (!entry) throw new Error("順番待ちデータが見つかりません");
+  if (prefs.email !== undefined) entry.email = prefs.email;
+  if (prefs.notificationEmail !== undefined) entry.notificationEmail = prefs.notificationEmail;
+  if (prefs.notificationLine !== undefined) entry.notificationLine = prefs.notificationLine;
+  entry.updatedAt = new Date().toISOString();
   await persistDatabase();
   return entry;
 }
@@ -788,9 +945,12 @@ export async function getQueuePosition(
   }
   const idx = waitingIndexForEntry(queue, entryId);
   if (idx < 0) return null;
+  // 後回し中（postponeRemainingSlots>0）は仮想的に N 組ぶん後ろにずらす
+  const postponeShift = entry.postponeRemainingSlots ?? 0;
+  const adjustedPosition = idx + postponeShift;
   return {
-    position: idx,
-    estimatedWait: idx * 5,
+    position: adjustedPosition,
+    estimatedWait: adjustedPosition * 5,
   };
 }
 
@@ -856,7 +1016,9 @@ function getDefaultStoreSettings(storeId: string): StoreSettings {
     isReceptionOpen: true,
     isTodayException: false,
     callMessage: "番号 {number} のお客様、ご来店をお願いいたします。",
-    autoCancelMinutes: 10,
+    autoCancelMinutes: 5,
+    defaultPostponeSlots: 3,
+    showSmallPartyTab: false,
     updatedAt: new Date().toISOString(),
     portalDisplayName: "",
     portalCategory: "レストラン",
@@ -886,6 +1048,9 @@ function normalizeStoreSettings(raw: StoreSettings): StoreSettings {
     portalMenuItems: Array.isArray(raw.portalMenuItems) ? raw.portalMenuItems : d.portalMenuItems,
     portalReviews: Array.isArray(raw.portalReviews) ? raw.portalReviews : d.portalReviews,
     portalRating: typeof raw.portalRating === "number" && !Number.isNaN(raw.portalRating) ? raw.portalRating : d.portalRating,
+    defaultPostponeSlots: typeof raw.defaultPostponeSlots === "number" && Number.isFinite(raw.defaultPostponeSlots)
+      ? Math.min(5, Math.max(2, Math.round(raw.defaultPostponeSlots)))
+      : d.defaultPostponeSlots,
   };
 }
 
@@ -1037,6 +1202,11 @@ export async function updateStoreSettings(
   if (data.isTodayException !== undefined) settings.isTodayException = data.isTodayException;
   if (data.callMessage !== undefined) settings.callMessage = data.callMessage;
   if (data.autoCancelMinutes !== undefined) settings.autoCancelMinutes = data.autoCancelMinutes;
+  if (data.defaultPostponeSlots !== undefined) {
+    const n = Math.round(Number(data.defaultPostponeSlots));
+    settings.defaultPostponeSlots = Number.isFinite(n) ? Math.min(5, Math.max(2, n)) : 3;
+  }
+  if (data.showSmallPartyTab !== undefined) settings.showSmallPartyTab = data.showSmallPartyTab;
   if (data.portalDisplayName !== undefined) settings.portalDisplayName = data.portalDisplayName;
   if (data.portalCategory !== undefined) settings.portalCategory = data.portalCategory;
   if (data.portalImageUrl !== undefined) {

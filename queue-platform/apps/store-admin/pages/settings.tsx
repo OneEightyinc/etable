@@ -30,6 +30,7 @@ interface StoreSettings {
   isTodayException: boolean;
   callMessage: string;
   autoCancelMinutes: number;
+  defaultPostponeSlots?: number;
   portalDisplayName?: string;
   portalCategory?: string;
   portalImageUrl?: string;
@@ -55,6 +56,7 @@ export default function SettingsPage() {
   const [isTodayException, setIsTodayException] = useState(false);
   const [message, setMessage] = useState('番号 {number} のお客様、ご来店をお願いいたします。');
   const [autoCancelMinutes, setAutoCancelMinutes] = useState(10);
+  const [defaultPostponeSlots, setDefaultPostponeSlots] = useState(3);
 
   // ポイント倍率設定
   const [idleTimeEnabled, setIdleTimeEnabled] = useState(false);
@@ -106,6 +108,11 @@ export default function SettingsPage() {
         setIsTodayException(s.isTodayException ?? false);
         setMessage(s.callMessage || '番号 {number} のお客様、ご来店をお願いいたします。');
         setAutoCancelMinutes(s.autoCancelMinutes || 10);
+        setDefaultPostponeSlots(
+          typeof s.defaultPostponeSlots === 'number'
+            ? Math.min(5, Math.max(2, Math.round(s.defaultPostponeSlots)))
+            : 3
+        );
         setPortalDisplayName(s.portalDisplayName ?? '');
         setPortalCategory(s.portalCategory ?? 'レストラン');
         setPortalImageUrl(s.portalImageUrl ?? '');
@@ -154,6 +161,7 @@ export default function SettingsPage() {
           isTodayException,
           callMessage: message,
           autoCancelMinutes,
+          defaultPostponeSlots: Math.min(5, Math.max(2, Math.round(defaultPostponeSlots))),
           portalDisplayName,
           portalCategory,
           portalImageUrl,
@@ -712,18 +720,38 @@ export default function SettingsPage() {
         {/* 自動ルール設定 Section */}
         <div>
           <h2 className="text-sm font-semibold text-[#082752]">自動ルール設定</h2>
-          <div className="bg-white rounded-[32px] p-5 border border-gray-100 mt-4">
-            <label className="text-xs text-gray-500 mb-2 block">自動キャンセルに移行する時間（分）</label>
-            <div className="flex items-center bg-gray-50 rounded-xl border border-gray-200 px-4 py-3">
-              <input
-                type="number"
-                value={autoCancelMinutes}
-                onChange={(e) => setAutoCancelMinutes(parseInt(e.target.value) || 0)}
-                className="flex-1 text-sm text-[#082752] bg-transparent outline-none text-center"
-                min="1"
-                max="120"
-              />
-              <span className="text-xs text-gray-400">分</span>
+          <div className="bg-white rounded-[32px] p-5 border border-gray-100 mt-4 space-y-4">
+            <div>
+              <label className="text-xs text-gray-500 mb-2 block">自動キャンセルに移行する時間（分）</label>
+              <div className="flex items-center bg-gray-50 rounded-xl border border-gray-200 px-4 py-3">
+                <input
+                  type="number"
+                  value={autoCancelMinutes}
+                  onChange={(e) => setAutoCancelMinutes(parseInt(e.target.value) || 0)}
+                  className="flex-1 text-sm text-[#082752] bg-transparent outline-none text-center"
+                  min="1"
+                  max="120"
+                />
+                <span className="text-xs text-gray-400">分</span>
+              </div>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-2 block">後回しの既定組数（2〜5）</label>
+              <p className="text-[11px] text-gray-400 mb-2">お客様が「後回し」を選んだ際に、現在位置から後ろにずらす組数。</p>
+              <div className="flex items-center bg-gray-50 rounded-xl border border-gray-200 px-4 py-3">
+                <input
+                  type="number"
+                  value={defaultPostponeSlots}
+                  onChange={(e) => {
+                    const n = parseInt(e.target.value) || 3;
+                    setDefaultPostponeSlots(Math.min(5, Math.max(2, n)));
+                  }}
+                  className="flex-1 text-sm text-[#082752] bg-transparent outline-none text-center"
+                  min="2"
+                  max="5"
+                />
+                <span className="text-xs text-gray-400">組</span>
+              </div>
             </div>
           </div>
         </div>

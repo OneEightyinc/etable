@@ -18,6 +18,8 @@ export {
   updateQueueStatusApi,
   updateQueueDetailsApi,
   deleteQueueEntryApi,
+  userPostponeQueueEntryApi,
+  markNoShowHoldApi,
   getQueuePosition as getQueuePositionApi,
   getQueueStats as getQueueStatsApi,
   subscribeToQueue,

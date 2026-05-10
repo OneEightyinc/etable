@@ -129,6 +129,13 @@ export interface QueueEntryData {
   createdAt: string;
   updatedAt: string;
   userPostponedCount?: number;
+  postponeRemainingSlots?: number;
+  recallCount?: number;
+  holdReason?: 'NO_SHOW';
+  email?: string;
+  lineUserId?: string;
+  notificationLine?: boolean;
+  notificationEmail?: boolean;
   customerId?: string;
 }
 
@@ -175,6 +182,29 @@ export async function updateQueueDetailsApi(
 
 export async function deleteQueueEntryApi(id: string): Promise<void> {
   await request(`/queue/${id}`, { method: 'DELETE' });
+}
+
+/** ユーザー主導の後回し（status は WAITING のまま、サーバー側で店舗設定の defaultPostponeSlots ぶん遅らせる）。
+ *  slots を省略すると店舗設定の defaultPostponeSlots（既定 3、範囲 2〜5）が使われる。
+ */
+export async function userPostponeQueueEntryApi(
+  id: string,
+  slots?: number
+): Promise<QueueEntryData> {
+  const body = typeof slots === 'number' && slots > 0 ? { slots } : {};
+  const result = await request<{ entry: QueueEntryData }>(`/queue/${id}/postpone`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+  return result.entry;
+}
+
+/** 不在検知 → 保留状態へ自動遷移（store-admin の polling で 5 分超過時に呼ぶ）。 */
+export async function markNoShowHoldApi(id: string): Promise<QueueEntryData> {
+  const result = await request<{ entry: QueueEntryData }>(`/queue/${id}/no-show`, {
+    method: 'POST',
+  });
+  return result.entry;
 }
 
 export async function getQueuePosition(

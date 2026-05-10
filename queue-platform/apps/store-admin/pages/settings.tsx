@@ -38,6 +38,7 @@ interface StoreSettings {
   callMessage: string;
   autoCancelMinutes: number;
   defaultPostponeSlots?: number;
+  showSmallPartyTab?: boolean;
   portalDisplayName?: string;
   portalCategory?: string;
   portalImageUrl?: string;
@@ -72,6 +73,7 @@ export default function SettingsPage() {
   const [message, setMessage] = useState('番号 {number} のお客様、ご来店をお願いいたします。');
   const [autoCancelMinutes, setAutoCancelMinutes] = useState(10);
   const [defaultPostponeSlots, setDefaultPostponeSlots] = useState(3);
+  const [showSmallPartyTab, setShowSmallPartyTab] = useState(false);
 
   // ポイント倍率設定
   const [idleTimeEnabled, setIdleTimeEnabled] = useState(false);
@@ -128,6 +130,7 @@ export default function SettingsPage() {
             ? Math.min(5, Math.max(2, Math.round(s.defaultPostponeSlots)))
             : 3
         );
+        setShowSmallPartyTab(s.showSmallPartyTab === true);
         setPortalDisplayName(s.portalDisplayName ?? '');
         setPortalCategory(s.portalCategory ?? 'レストラン');
         setPortalImageUrl(s.portalImageUrl ?? '');
@@ -229,6 +232,7 @@ export default function SettingsPage() {
           callMessage: message,
           autoCancelMinutes,
           defaultPostponeSlots: Math.min(5, Math.max(2, Math.round(defaultPostponeSlots))),
+          showSmallPartyTab,
           portalDisplayName,
           portalCategory,
           portalImageUrl,
@@ -819,6 +823,18 @@ export default function SettingsPage() {
                 />
                 <span className="text-xs text-gray-400">組</span>
               </div>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-2 block">「1〜2 名」タブを表示</label>
+              <p className="text-[11px] text-gray-400 mb-2">店舗ビューに少人数（合計 2 名以下）専用の絞り込みタブを追加します。</p>
+              <button
+                type="button"
+                onClick={() => setShowSmallPartyTab((v) => !v)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${showSmallPartyTab ? 'bg-[#FD780F]' : 'bg-gray-300'}`}
+                aria-pressed={showSmallPartyTab}
+              >
+                <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition ${showSmallPartyTab ? 'translate-x-5' : 'translate-x-1'}`} />
+              </button>
             </div>
           </div>
         </div>

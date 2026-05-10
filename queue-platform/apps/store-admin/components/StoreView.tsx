@@ -10,6 +10,7 @@ import {
   deleteQueueEntryApi,
   addToQueueApi,
   userPostponeQueueEntryApi,
+  getStoreSettingsApi,
   type QueueEntryData,
 } from '@queue-platform/api';
 import { storeScopedPath } from '../lib/storePaths';
@@ -19,7 +20,7 @@ import { useEmployee } from '../lib/EmployeeContext';
 import EmployeeSelectModal from './EmployeeSelectModal';
 
 /* ─── helpers ─── */
-type FilterTab = 'all' | 'hold-postpone' | 'table' | 'counter';
+type FilterTab = 'all' | 'hold-postpone' | 'table' | 'counter' | 'small-party';
 
 function getSeatLabel(s: string) {
   if (s === 'TABLE') return 'テーブル';
@@ -102,6 +103,20 @@ const StoreView: React.FC<{ storeId?: string; onLogout?: () => void }> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [now, setNow] = useState(new Date());
+  const [showSmallPartyTab, setShowSmallPartyTab] = useState(false);
+
+  useEffect(() => {
+    if (!storeId) return;
+    let cancelled = false;
+    getStoreSettingsApi(storeId)
+      .then((s) => {
+        if (!cancelled) setShowSmallPartyTab(s.showSmallPartyTab === true);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [storeId]);
 
   /* UI state */
   const [filterTab, setFilterTab] = useState<FilterTab>('all');
@@ -170,11 +185,12 @@ const StoreView: React.FC<{ storeId?: string; onLogout?: () => void }> = ({
 
   const filteredGuests = (() => {
     if (filterTab === 'hold-postpone') return holdOrPostponed;
-    // 「すべて」「テーブル」「カウンター」では HOLD は除外（保留・後回しタブ専用）
+    // 「すべて」「テーブル」「カウンター」「1〜2 名」では HOLD は除外（保留・後回しタブ専用）
     const base = activeGuests.filter(c => c.status !== 'HOLD');
     return base.filter(c => {
       if (filterTab === 'table') return c.seatType === 'TABLE';
       if (filterTab === 'counter') return c.seatType === 'COUNTER';
+      if (filterTab === 'small-party') return (c.adults + c.children) <= 2;
       return true;
     });
   })();
@@ -443,7 +459,13 @@ const StoreView: React.FC<{ storeId?: string; onLogout?: () => void }> = ({
       {/* ─── FILTER TABS ─── */}
       <div className="bg-white border-b border-gray-100 pt-2 pb-0 sticky top-0 z-[5]">
         <div className="flex">
-          {([['all','すべて'],['hold-postpone','保留・後回し'],['table','テーブル'],['counter','カウンター']] as [FilterTab,string][]).map(([key, label]) => (
+          {(([
+            ['all','すべて'],
+            ['hold-postpone','保留・後回し'],
+            ['table','テーブル'],
+            ['counter','カウンター'],
+            ...(showSmallPartyTab ? [['small-party','1〜2 名'] as [FilterTab,string]] : []),
+          ]) as [FilterTab,string][]).map(([key, label]) => (
             <button key={key} onClick={() => setFilterTab(key)} className={`flex-1 pt-3 pb-4 text-sm font-medium transition-colors relative ${filterTab === key ? 'text-[#FD780F]' : 'text-gray-500 hover:text-gray-700'}`}>
               {label}
               {filterTab === key && <div className="absolute bottom-0 left-1/4 right-1/4 h-1 bg-[#FD780F] rounded-full" />}

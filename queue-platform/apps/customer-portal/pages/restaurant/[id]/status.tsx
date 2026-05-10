@@ -10,8 +10,7 @@ import {
 } from "../../../lib/storage";
 import { useRestaurantById } from "../../../lib/useRestaurantById";
 
-const POSTPONE_GROUPS = 3;
-const POSTPONE_MINUTES = 12;
+const POSTPONE_MINUTES_PER_SLOT = 4;
 
 /* ---------- Inline SVG Icons ---------- */
 const ChevronLeftIcon = () => (
@@ -210,7 +209,8 @@ const ReservationStatusPage: React.FC = () => {
 
   const handleDelay = async () => {
     if (!reservation) return;
-    updateReservationWait(reservation.id, POSTPONE_GROUPS, POSTPONE_MINUTES);
+    const slots = restaurant?.defaultPostponeSlots ?? 3;
+    updateReservationWait(reservation.id, slots, slots * POSTPONE_MINUTES_PER_SLOT);
     // サーバー側にも後回しを通知
     if (reservation.queueEntryId) {
       try {
@@ -736,7 +736,7 @@ const ReservationStatusPage: React.FC = () => {
       )}
       {isDelayModalOpen && (
         <Modal title="順番を後回しにしますか？" confirmText="はい、後回しにします" onClose={() => setIsDelayModalOpen(false)} onConfirm={handleDelay} confirmColor="orange">
-          <p className="mb-4 text-center text-[14px] text-[#666]">あと{POSTPONE_GROUPS}組・約{POSTPONE_MINUTES}分お呼び出しが遅れます。</p>
+          <p className="mb-4 text-center text-[14px] text-[#666]">あと{restaurant?.defaultPostponeSlots ?? 3}組・約{(restaurant?.defaultPostponeSlots ?? 3) * POSTPONE_MINUTES_PER_SLOT}分お呼び出しが遅れます。</p>
         </Modal>
       )}
       {isEmailModalOpen && (

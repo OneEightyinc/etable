@@ -12,6 +12,7 @@ export type Restaurant = {
   waitingGroups: number;
   shortestWaitMinutes: number;
   approxWaitText: string;
+  defaultPostponeSlots: number;
   tags: string[];
   description: string;
   address: string;

@@ -336,6 +336,7 @@ export type StorePortalProfile = {
   waitingGroups: number;
   approxWaitText: string;
   shortestWaitMinutes: number;
+  defaultPostponeSlots: number;
 };
 
 interface Database {
@@ -1278,6 +1279,7 @@ function storePortalProfileFromParts(
     waitingGroups,
     approxWaitText,
     shortestWaitMinutes: estimated,
+    defaultPostponeSlots: s.defaultPostponeSlots,
   };
 }
 

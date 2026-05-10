@@ -151,10 +151,10 @@ const MyReservations: React.FC = () => {
                     </Link>
                     <div className="border-t border-[#f3f3f3] bg-[#fffaf7] px-4 py-3">
                       <Link
-                        href={`/survey/${encodeURIComponent(r.restaurantId)}`}
+                        href={`/restaurant/${encodeURIComponent(r.restaurantId)}/status`}
                         className="flex w-full items-center justify-center rounded-full border border-[#ff6b00] bg-white py-3 text-[14px] font-bold text-[#ff6b00] shadow-[0_2px_8px_rgba(255,107,0,0.12)]"
                       >
-                        来店アンケートに回答する
+                        レビューを作成する
                       </Link>
                     </div>
                   </div>

@@ -105,6 +105,10 @@ export interface QueueEntry {
   notificationEmail?: boolean;
   /** 会員顧客ID（ポイント付与用） */
   customerId?: string;
+  /** 受付アンケート: 利用目的（PDF F の入口アンケート） */
+  visitPurpose?: "lunch" | "dinner" | "drinking" | "date" | "work_cafe" | "other";
+  /** 受付アンケート: 利用形態 */
+  groupType?: "solo" | "friends" | "couple" | "family" | "business";
 }
 
 export interface Session {
@@ -876,6 +880,9 @@ export async function addToQueue(data: {
   children: number;
   seatType: "TABLE" | "COUNTER" | "EITHER";
   phone?: string;
+  visitPurpose?: QueueEntry["visitPurpose"];
+  groupType?: QueueEntry["groupType"];
+  customerId?: string;
 }): Promise<QueueEntry> {
   const db = await readDatabase();
   const ticketNumber = bumpTicketNumber(db, data.storeId);
@@ -892,6 +899,9 @@ export async function addToQueue(data: {
     arrivalTime: now,
     createdAt: now,
     updatedAt: now,
+    visitPurpose: data.visitPurpose,
+    groupType: data.groupType,
+    customerId: data.customerId,
   };
   db.queue.push(entry);
   await persistDatabase();

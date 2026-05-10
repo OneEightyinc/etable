@@ -179,10 +179,13 @@ const ReservePage: React.FC = () => {
       const res = await fetch("/api/queue/join", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           storeId: restaurantId,
           peopleCount: count,
           seatType,
+          visitPurpose,
+          groupType,
         }),
       });
       const data = (await res.json()) as {

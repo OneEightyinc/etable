@@ -5,7 +5,20 @@ import {
   getQueuePosition,
   getStorePortalProfile,
   broadcastToStore,
+  getCustomerIdFromRequest,
 } from "@queue-platform/api/src/server";
+
+const VISIT_PURPOSES = ["lunch", "dinner", "drinking", "date", "work_cafe", "other"] as const;
+const GROUP_TYPES = ["solo", "friends", "couple", "family", "business"] as const;
+type VisitPurpose = (typeof VISIT_PURPOSES)[number];
+type GroupType = (typeof GROUP_TYPES)[number];
+
+function asVisitPurpose(v: unknown): VisitPurpose | undefined {
+  return typeof v === "string" && (VISIT_PURPOSES as readonly string[]).includes(v) ? (v as VisitPurpose) : undefined;
+}
+function asGroupType(v: unknown): GroupType | undefined {
+  return typeof v === "string" && (GROUP_TYPES as readonly string[]).includes(v) ? (v as GroupType) : undefined;
+}
 
 function parseJsonBody(req: NextApiRequest): Record<string, unknown> {
   const b = req.body;
@@ -51,11 +64,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const seatType = mapSeatType(seatLabel);
+    const visitPurpose = asVisitPurpose(body.visitPurpose);
+    const groupType = asGroupType(body.groupType);
+    const customerId = getCustomerIdFromRequest(req) ?? undefined;
     const entry = await addToQueue({
       storeId,
       adults: peopleCount,
       children: 0,
       seatType,
+      visitPurpose,
+      groupType,
+      customerId,
     });
 
     const pos = await getQueuePosition(storeId, entry.id);

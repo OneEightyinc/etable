@@ -864,10 +864,10 @@ const MyPage: React.FC = () => {
                         </Link>
                         <div className="border-t border-[#f3f3f3] px-3 pb-3">
                           <Link
-                            href={`/survey/${encodeURIComponent(r.restaurantId)}`}
+                            href={`/restaurant/${encodeURIComponent(r.restaurantId)}/status`}
                             className="block w-full rounded-full border border-[#ff6b00] py-2 text-center text-[12px] font-bold text-[#ff6b00]"
                           >
-                            来店アンケートに回答する
+                            レビューを作成する
                           </Link>
                         </div>
                       </div>

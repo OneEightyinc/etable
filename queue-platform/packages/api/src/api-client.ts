@@ -23,6 +23,55 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
   return res.json();
 }
 
+// ─── Employees & Operation Log ──────────────────────────
+export interface EmployeeData {
+  id: string;
+  name: string;
+  createdAt: string;
+}
+
+/** 操作ログの actor 情報。store-admin の各 mutation API に body の `actor` として送る。 */
+export interface ActorData {
+  employeeId: string;
+  employeeName: string;
+}
+
+export interface OperationLogData {
+  id: string;
+  storeId: string;
+  entryId?: string;
+  ticketNumber?: number;
+  action:
+    | 'CALL' | 'RECALL' | 'DONE' | 'HOLD' | 'BACK_TO_WAITING'
+    | 'CANCEL' | 'POSTPONE_USER' | 'POSTPONE_STORE' | 'EDIT' | 'EMPLOYEE_SELECT';
+  employeeId?: string;
+  employeeName?: string;
+  details?: Record<string, unknown>;
+  createdAt: string;
+}
+
+export async function listEmployeesApi(storeId: string): Promise<EmployeeData[]> {
+  const data = await request<{ employees: EmployeeData[] }>(`/employees?storeId=${storeId}`);
+  return data.employees;
+}
+
+export async function addEmployeeApi(storeId: string, name: string): Promise<EmployeeData> {
+  const data = await request<{ employee: EmployeeData }>('/employees', {
+    method: 'POST',
+    body: JSON.stringify({ storeId, name }),
+  });
+  return data.employee;
+}
+
+export async function removeEmployeeApi(storeId: string, employeeId: string): Promise<void> {
+  await request(`/employees/${employeeId}?storeId=${storeId}`, { method: 'DELETE' });
+}
+
+export async function listOperationLogsApi(storeId: string, limit = 200): Promise<OperationLogData[]> {
+  const data = await request<{ logs: OperationLogData[] }>(`/operation-logs?storeId=${storeId}&limit=${limit}`);
+  return data.logs;
+}
+
 // ─── Auth ────────────────────────────────────────────────
 export interface LoginResponse {
   sessionId: string;
@@ -160,38 +209,47 @@ export async function addToQueueApi(data: {
 
 export async function updateQueueStatusApi(
   id: string,
-  status: 'WAITING' | 'CALLED' | 'HOLD' | 'DONE' | 'CANCELLED'
+  status: 'WAITING' | 'CALLED' | 'HOLD' | 'DONE' | 'CANCELLED',
+  actor?: ActorData
 ): Promise<QueueEntryData> {
   const result = await request<{ entry: QueueEntryData }>(`/queue/${id}`, {
     method: 'PATCH',
-    body: JSON.stringify({ status }),
+    body: JSON.stringify({ status, actor }),
   });
   return result.entry;
 }
 
 export async function updateQueueDetailsApi(
   id: string,
-  data: Partial<{ adults: number; children: number; seatType: 'TABLE' | 'COUNTER' | 'EITHER' }>
+  data: Partial<{ adults: number; children: number; seatType: 'TABLE' | 'COUNTER' | 'EITHER' }>,
+  actor?: ActorData
 ): Promise<QueueEntryData> {
   const result = await request<{ entry: QueueEntryData }>(`/queue/${id}`, {
     method: 'PATCH',
-    body: JSON.stringify(data),
+    body: JSON.stringify({ ...data, actor }),
   });
   return result.entry;
 }
 
-export async function deleteQueueEntryApi(id: string): Promise<void> {
-  await request(`/queue/${id}`, { method: 'DELETE' });
+export async function deleteQueueEntryApi(id: string, actor?: ActorData): Promise<void> {
+  await request(`/queue/${id}`, {
+    method: 'DELETE',
+    body: actor ? JSON.stringify({ actor }) : undefined,
+  });
 }
 
 /** ユーザー主導の後回し（status は WAITING のまま、サーバー側で店舗設定の defaultPostponeSlots ぶん遅らせる）。
  *  slots を省略すると店舗設定の defaultPostponeSlots（既定 3、範囲 2〜5）が使われる。
+ *  actor 付き（store-admin から）は POSTPONE_STORE、なし（顧客本人）は POSTPONE_USER として記録される。
  */
 export async function userPostponeQueueEntryApi(
   id: string,
-  slots?: number
+  slots?: number,
+  actor?: ActorData
 ): Promise<QueueEntryData> {
-  const body = typeof slots === 'number' && slots > 0 ? { slots } : {};
+  const body: Record<string, unknown> = {};
+  if (typeof slots === 'number' && slots > 0) body.slots = slots;
+  if (actor) body.actor = actor;
   const result = await request<{ entry: QueueEntryData }>(`/queue/${id}/postpone`, {
     method: 'POST',
     body: JSON.stringify(body),
@@ -200,9 +258,10 @@ export async function userPostponeQueueEntryApi(
 }
 
 /** 不在検知 → 保留状態へ自動遷移（store-admin の polling で 5 分超過時に呼ぶ）。 */
-export async function markNoShowHoldApi(id: string): Promise<QueueEntryData> {
+export async function markNoShowHoldApi(id: string, actor?: ActorData): Promise<QueueEntryData> {
   const result = await request<{ entry: QueueEntryData }>(`/queue/${id}/no-show`, {
     method: 'POST',
+    body: actor ? JSON.stringify({ actor }) : undefined,
   });
   return result.entry;
 }

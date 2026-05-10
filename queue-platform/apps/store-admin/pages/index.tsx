@@ -5,6 +5,7 @@ import StoreView from "../components/StoreView";
 import StoreLoginScreen from "../components/StoreLoginScreen";
 import ReceptionStartScreen from "../components/ReceptionStartScreen";
 import { isStoreReceptionStarted, markStoreReceptionStarted, clearStoreAdminSession } from "../lib/storeAdminSession";
+import { useEmployee } from "../lib/EmployeeContext";
 
 type Phase = "hydrate" | "login" | "closed" | "app";
 
@@ -12,6 +13,7 @@ const StoreAdminPage: NextPage = () => {
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>("hydrate");
   const [bannerError, setBannerError] = useState("");
+  const { clearActor } = useEmployee();
 
   const runAuthGate = useCallback(async () => {
     try {
@@ -71,6 +73,7 @@ const StoreAdminPage: NextPage = () => {
       /* ignore */
     }
     clearStoreAdminSession();
+    clearActor();
     setPhase("login");
   };
 

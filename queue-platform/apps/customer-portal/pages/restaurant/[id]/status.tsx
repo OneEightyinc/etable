@@ -599,7 +599,7 @@ const ReservationStatusPage: React.FC = () => {
                     onClick={() => void handleGoogleReview()}
                     className="mb-2 w-full rounded-full bg-[#ff6b00] py-3.5 text-[15px] font-bold text-white shadow-[0_4px_12px_rgba(255,107,0,0.3)]"
                   >
-                    Googleレビューを書く（+300pt）
+                    レビューを書いて特典GET
                   </button>
 
                   {/* ETABLEレビュー自由記述 */}

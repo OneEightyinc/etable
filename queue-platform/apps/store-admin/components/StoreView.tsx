@@ -15,6 +15,8 @@ import {
 import { storeScopedPath } from '../lib/storePaths';
 import { useStoreAdminPublicToken } from '../lib/StoreAdminPublicTokenContext';
 import { clearStoreAdminSession } from '../lib/storeAdminSession';
+import { useEmployee } from '../lib/EmployeeContext';
+import EmployeeSelectModal from './EmployeeSelectModal';
 
 /* ─── helpers ─── */
 type FilterTab = 'all' | 'hold-postpone' | 'table' | 'counter';
@@ -89,6 +91,13 @@ const StoreView: React.FC<{ storeId?: string; onLogout?: () => void }> = ({
     (storeIdProp && storeIdProp.trim()) ||
     sessionStoreId ||
     "";
+
+  const { actor, setStoreId: registerStoreId } = useEmployee();
+  const [showEmployeeSwitch, setShowEmployeeSwitch] = useState(false);
+  useEffect(() => {
+    if (storeId) registerStoreId(storeId);
+  }, [storeId, registerStoreId]);
+
   const [customers, setCustomers] = useState<QueueEntryData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -173,12 +182,13 @@ const StoreView: React.FC<{ storeId?: string; onLogout?: () => void }> = ({
   const estWait = (waitingGuests.length * 5) + waitTimeOffset;
 
   /* actions */
+  const actorOrUndef = actor ?? undefined;
   const handleCall = async (id: string) => {
-    try { await updateQueueStatusApi(id, 'CALLED'); } catch (e: any) { setError(e.message); }
+    try { await updateQueueStatusApi(id, 'CALLED', actorOrUndef); } catch (e: any) { setError(e.message); }
   };
   const handleDone = async (id: string) => {
     try {
-      await updateQueueStatusApi(id, "DONE");
+      await updateQueueStatusApi(id, "DONE", actorOrUndef);
       setGuidingSinceById((s) => {
         const n = { ...s };
         delete n[id];
@@ -191,28 +201,28 @@ const StoreView: React.FC<{ storeId?: string; onLogout?: () => void }> = ({
     }
   };
   const handleHold = async (id: string) => {
-    try { await updateQueueStatusApi(id, 'HOLD'); } catch (e: any) { setError(e.message); }
+    try { await updateQueueStatusApi(id, 'HOLD', actorOrUndef); } catch (e: any) { setError(e.message); }
   };
   const handleBackToWaiting = async (id: string) => {
     try {
-      await updateQueueStatusApi(id, 'WAITING');
+      await updateQueueStatusApi(id, 'WAITING', actorOrUndef);
     } catch (e: any) { setError(e.message); }
   };
   /** HOLD 状態から再呼び出し。CALLED に戻し、5 分後に再不在なら自動キャンセル（サーバー側 processStaleCalloutsInDb）。 */
   const handleRecall = async (id: string) => {
     try {
-      await updateQueueStatusApi(id, 'CALLED');
+      await updateQueueStatusApi(id, 'CALLED', actorOrUndef);
     } catch (e: any) { setError(e.message); }
   };
 
   /** 後回し: status は WAITING のまま、サーバー側で店舗設定の defaultPostponeSlots を slot にしてずらす。 */
   const handlePostpone = async (id: string) => {
     try {
-      await userPostponeQueueEntryApi(id);
+      await userPostponeQueueEntryApi(id, undefined, actorOrUndef);
     } catch (e: any) { setError(e.message); }
   };
   const handleCancel = async (id: string) => {
-    try { await deleteQueueEntryApi(id); } catch (e: any) { setError(e.message); }
+    try { await deleteQueueEntryApi(id, actorOrUndef); } catch (e: any) { setError(e.message); }
   };
 
   const handleCallNext = () => {
@@ -235,7 +245,7 @@ const StoreView: React.FC<{ storeId?: string; onLogout?: () => void }> = ({
   const handleSaveDetails = async () => {
     if (!editModal.guest) return;
     try {
-      await updateQueueDetailsApi(editModal.guest.id, { adults: editForm.adults, children: editForm.children, seatType: editForm.seatType });
+      await updateQueueDetailsApi(editModal.guest.id, { adults: editForm.adults, children: editForm.children, seatType: editForm.seatType }, actorOrUndef);
       setEditModal({ isOpen: false, guest: null });
     } catch (e: any) { setError(e.message); }
   };
@@ -646,6 +656,26 @@ const StoreView: React.FC<{ storeId?: string; onLogout?: () => void }> = ({
               </div>
             </div>
             <div className="flex-1 overflow-y-auto px-6 py-4">
+              {/* Current Operator */}
+              <div className="mb-6">
+                <p className="text-xs text-gray-400 tracking-widest mb-3">OPERATOR</p>
+                <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+                  <div>
+                    <p className="text-[10px] text-gray-400">現在の担当</p>
+                    <p className="text-sm font-bold text-[#082752]">
+                      {actor ? actor.employeeName : "未選択"}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setSidebarOpen(false); setShowEmployeeSwitch(true); }}
+                    className="rounded-full border border-[#082752] px-3 py-1.5 text-[11px] font-bold text-[#082752]"
+                  >
+                    {actor ? "切替" : "選択"}
+                  </button>
+                </div>
+              </div>
+
               {/* Operating Mode */}
               <div className="mb-6">
                 <p className="text-xs text-gray-400 tracking-widest mb-3">OPERATING MODE</p>
@@ -695,6 +725,10 @@ const StoreView: React.FC<{ storeId?: string; onLogout?: () => void }> = ({
                   <Link href={storeScopedPath(publicToken, "/history", storeId)} className="w-full flex items-center gap-3 px-4 py-3.5 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
                     <svg className="w-5 h-5 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
                     <span className="font-medium text-[#082752]">案内・キャンセル履歴</span>
+                  </Link>
+                  <Link href={storeScopedPath(publicToken, "/operation-logs", storeId)} className="w-full flex items-center gap-3 px-4 py-3.5 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+                    <svg className="w-5 h-5 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" /></svg>
+                    <span className="font-medium text-[#082752]">担当者操作ログ</span>
                   </Link>
                   <Link href={storeScopedPath(publicToken, "/settings", storeId)} className="w-full flex items-center gap-3 px-4 py-3.5 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
                     <svg className="w-5 h-5 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 00.33 1.82l0 0a2 2 0 11-2.83 2.83l0 0A1.65 1.65 0 0015 19.4a1.65 1.65 0 00-1 1.13v0a2 2 0 01-4 0v0A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l0 0a2 2 0 11-2.83-2.83l0 0A1.65 1.65 0 004.6 15a1.65 1.65 0 00-1.13-1v0a2 2 0 010-4v0A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l0 0a2 2 0 112.83-2.83l0 0A1.65 1.65 0 009 4.6a1.65 1.65 0 001-1.13v0a2 2 0 014 0v0A1.65 1.65 0 0015 4.6a1.65 1.65 0 001.82-.33l0 0a2 2 0 112.83 2.83l0 0A1.65 1.65 0 0019.4 9a1.65 1.65 0 00.33 1.82v0a2 2 0 010 4v0z" /></svg>
@@ -903,6 +937,19 @@ const StoreView: React.FC<{ storeId?: string; onLogout?: () => void }> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* 担当者未選択時の必須選択モーダル / 切替モーダル */}
+      {storeId && !actor && !showEmployeeSwitch && (
+        <EmployeeSelectModal storeId={storeId} />
+      )}
+      {storeId && showEmployeeSwitch && (
+        <EmployeeSelectModal
+          storeId={storeId}
+          switchMode
+          onClose={() => setShowEmployeeSwitch(false)}
+          onSelected={() => setShowEmployeeSwitch(false)}
+        />
       )}
 
     </div>

@@ -13,7 +13,7 @@ const POINT_TABLE = [
   { action: "初回会員登録", points: "+200pt", note: "初回のみ" },
   { action: "来店（案内完了）", points: "+100pt", note: "毎回" },
   { action: "待機中レビュー回答", points: "+50pt", note: "毎回" },
-  { action: "Googleレビュー投稿", points: "+300pt", note: "毎回" },
+  { action: "クチコミ投稿", points: "+300pt", note: "毎回" },
   { action: "友達招待", points: "+150pt", note: "お互いに" },
   { action: "アイドルタイム来店", points: "+100pt", note: "ボーナス" },
 ];
@@ -72,7 +72,7 @@ export default function MypageMemberPage() {
                 <div className="flex justify-between"><span className="text-[#666]">初回会員登録</span><span className="font-bold text-[#ff6b00]">+200pt</span></div>
                 <div className="flex justify-between"><span className="text-[#666]">来店ポイント</span><span className="font-bold text-[#ff6b00]">+100pt</span></div>
                 <div className="flex justify-between"><span className="text-[#666]">レビュー回答</span><span className="font-bold text-[#ff6b00]">+50pt</span></div>
-                <div className="flex justify-between"><span className="text-[#666]">Googleレビュー投稿</span><span className="font-bold text-[#ff6b00]">+300pt</span></div>
+                <div className="flex justify-between"><span className="text-[#666]">クチコミ投稿</span><span className="font-bold text-[#ff6b00]">+300pt</span></div>
                 <div className="mt-2 border-t border-[#f0f0f0] pt-2 flex justify-between">
                   <span className="font-bold text-[#333]">合計</span>
                   <span className="font-bold text-[#ff6b00]">650pt</span>

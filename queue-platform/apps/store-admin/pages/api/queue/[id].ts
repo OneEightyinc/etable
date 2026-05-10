@@ -14,14 +14,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   if (req.method === 'PATCH' || req.method === 'PUT') {
-    const { status, adults, children, seatType } = req.body;
+    const { status, adults, children, seatType, actor } = req.body;
     const existing = await getQueueEntryById(id);
     if (!existing) return res.status(404).json({ error: 'Entry not found' });
     if (!requireStoreAdminForStore(req, res, existing.storeId)) return;
     try {
       // 人数・席種変更
       if (adults !== undefined || children !== undefined || seatType !== undefined) {
-        const updated = await updateQueueDetails(id, { adults, children, seatType });
+        const updated = await updateQueueDetails(id, { adults, children, seatType }, actor);
         if (!status) {
           const queue = await getQueueByStore(updated.storeId);
           broadcastToStore(updated.storeId, 'queue_update', { type: 'DETAILS_CHANGE', entry: updated, queue });
@@ -33,7 +33,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (!['WAITING', 'CALLED', 'HOLD', 'DONE', 'CANCELLED'].includes(status)) {
           return res.status(400).json({ error: 'Invalid status' });
         }
-        const entry = await updateQueueStatus(id, status);
+        const entry = await updateQueueStatus(id, status, actor);
         const queue = await getQueueByStore(entry.storeId);
         broadcastToStore(entry.storeId, 'queue_update', { type: 'STATUS_CHANGE', entry, queue });
 
@@ -73,7 +73,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const entry = await getQueueEntryById(id);
     if (!entry) return res.status(404).json({ error: 'Entry not found' });
     if (!requireStoreAdminForStore(req, res, entry.storeId)) return;
-    await removeFromQueue(id);
+    const { actor } = (req.body ?? {}) as { actor?: { employeeId: string; employeeName: string } };
+    await removeFromQueue(id, actor);
     const queue = await getQueueByStore(entry.storeId);
     broadcastToStore(entry.storeId, 'queue_update', { type: 'REMOVED', entryId: id, queue });
     return res.status(200).json({ ok: true });

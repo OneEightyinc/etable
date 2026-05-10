@@ -12,7 +12,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!entry) return res.status(404).json({ error: 'Entry not found' });
   if (!requireStoreAdminForStore(req, res, entry.storeId)) return;
 
-  const { slots } = req.body as { slots?: number };
+  const { slots, actor } = req.body as { slots?: number; actor?: { employeeId: string; employeeName: string } };
   try {
     let resolvedSlots: number;
     if (typeof slots === 'number' && slots > 0) {
@@ -21,7 +21,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const settings = await getStoreSettings(entry.storeId);
       resolvedSlots = settings.defaultPostponeSlots;
     }
-    const updated = await userPostponeQueueEntry(id, resolvedSlots);
+    const updated = await userPostponeQueueEntry(id, resolvedSlots, actor);
     const queue = await getQueueByStore(updated.storeId);
     broadcastToStore(updated.storeId, 'queue_update', { type: 'POSTPONE', entry: updated, queue });
     return res.status(200).json({ entry: updated });

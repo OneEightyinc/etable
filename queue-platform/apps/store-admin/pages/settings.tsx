@@ -5,6 +5,13 @@ import { compressImageForPortal } from '../lib/compressImageForPortal';
 import { storeScopedPath } from '../lib/storePaths';
 import { useStoreAdminPublicToken } from '../lib/StoreAdminPublicTokenContext';
 import GlassModal from '../components/GlassModal';
+import {
+  listEmployeesApi,
+  addEmployeeApi,
+  removeEmployeeApi,
+  type EmployeeData,
+} from '@queue-platform/api';
+import { useEmployee } from '../lib/EmployeeContext';
 
 interface BusinessHour {
   id: string;
@@ -49,6 +56,14 @@ export default function SettingsPage() {
   const router = useRouter();
   const publicToken = useStoreAdminPublicToken();
   const storeId = (router.query.storeId as string) || 'shibuya-001';
+  const { actor: currentActor, setStoreId: registerStoreId, clearActor } = useEmployee();
+
+  const [employees, setEmployees] = useState<EmployeeData[]>([]);
+  const [employeesLoading, setEmployeesLoading] = useState(false);
+  const [newEmployeeName, setNewEmployeeName] = useState('');
+  const [employeeError, setEmployeeError] = useState('');
+  const [employeeBusy, setEmployeeBusy] = useState(false);
+  const [removeConfirm, setRemoveConfirm] = useState<EmployeeData | null>(null);
 
   const [businessHours, setBusinessHours] = useState<BusinessHour[]>([]);
   const [closedDays, setClosedDays] = useState<ClosedDay[]>([]);
@@ -135,6 +150,58 @@ export default function SettingsPage() {
       .catch(() => {})
       .finally(() => setIsLoading(false));
   }, [storeId]);
+
+  useEffect(() => {
+    if (!storeId) return;
+    registerStoreId(storeId);
+    let cancelled = false;
+    setEmployeesLoading(true);
+    listEmployeesApi(storeId)
+      .then((list) => {
+        if (!cancelled) setEmployees(list);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setEmployeesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [storeId, registerStoreId]);
+
+  const handleAddEmployee = async () => {
+    const trimmed = newEmployeeName.trim();
+    if (!trimmed) {
+      setEmployeeError('名前を入力してください');
+      return;
+    }
+    setEmployeeBusy(true);
+    setEmployeeError('');
+    try {
+      const emp = await addEmployeeApi(storeId, trimmed);
+      setEmployees((prev) => [...prev, emp]);
+      setNewEmployeeName('');
+    } catch (e: any) {
+      setEmployeeError(e?.message ?? '追加に失敗しました');
+    } finally {
+      setEmployeeBusy(false);
+    }
+  };
+
+  const handleRemoveEmployee = async (emp: EmployeeData) => {
+    setEmployeeBusy(true);
+    setEmployeeError('');
+    try {
+      await removeEmployeeApi(storeId, emp.id);
+      setEmployees((prev) => prev.filter((e) => e.id !== emp.id));
+      if (currentActor?.employeeId === emp.id) clearActor();
+    } catch (e: any) {
+      setEmployeeError(e?.message ?? '削除に失敗しました');
+    } finally {
+      setEmployeeBusy(false);
+      setRemoveConfirm(null);
+    }
+  };
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -756,6 +823,78 @@ export default function SettingsPage() {
           </div>
         </div>
 
+        {/* 担当者管理 Section */}
+        <div>
+          <h2 className="text-sm font-semibold text-[#082752]">担当者管理</h2>
+          <p className="mt-1 text-[11px] text-gray-400">
+            操作ログ（後回し・キャンセル等）に記録される担当者を登録します。各セッション開始時にここから選択した担当者として記録されます。
+          </p>
+          <div className="bg-white rounded-[32px] p-5 border border-gray-100 mt-4 space-y-4">
+            <div>
+              <label className="text-xs text-gray-500 mb-2 block">担当者を追加</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newEmployeeName}
+                  onChange={(e) => setNewEmployeeName(e.target.value)}
+                  placeholder="例: 山田 太郎"
+                  maxLength={30}
+                  className="flex-1 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-[#082752] outline-none focus:border-[#FD780F]"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddEmployee}
+                  disabled={employeeBusy || !newEmployeeName.trim()}
+                  className="px-4 rounded-xl bg-[#082752] text-sm font-medium text-white disabled:opacity-50"
+                >
+                  追加
+                </button>
+              </div>
+              {employeeError && <p className="mt-2 text-xs text-red-500">{employeeError}</p>}
+            </div>
+
+            <div>
+              <p className="text-xs text-gray-500 mb-2">登録済み担当者</p>
+              {employeesLoading ? (
+                <div className="flex justify-center py-4">
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-[#FD780F] border-t-transparent" />
+                </div>
+              ) : employees.length === 0 ? (
+                <p className="rounded-xl bg-gray-50 px-4 py-3 text-xs text-gray-400">
+                  まだ担当者が登録されていません。
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {employees.map((emp) => (
+                    <div
+                      key={emp.id}
+                      className="flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3"
+                    >
+                      <span className="text-sm font-medium text-[#082752]">
+                        {emp.name}
+                        {currentActor?.employeeId === emp.id && (
+                          <span className="ml-2 rounded-full bg-[#FFF7ED] px-2 py-0.5 text-[10px] font-bold text-[#FD780F]">
+                            現在の担当
+                          </span>
+                        )}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setRemoveConfirm(emp)}
+                        disabled={employeeBusy}
+                        className="text-xs text-red-500"
+                        aria-label="削除"
+                      >
+                        削除
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
         {/* ポイント倍率設定 Section */}
         <div>
           <h2 className="text-sm font-semibold text-[#082752]">ポイント倍率設定</h2>
@@ -853,6 +992,17 @@ export default function SettingsPage() {
           confirmText="保存する"
           onConfirm={() => { setShowSaveConfirm(false); handleSave(); }}
           onClose={() => setShowSaveConfirm(false)}
+        />
+      )}
+
+      {removeConfirm && (
+        <GlassModal
+          title="担当者を削除"
+          message={`「${removeConfirm.name}」を削除します。よろしいですか？`}
+          confirmText="削除する"
+          isDangerous
+          onConfirm={() => handleRemoveEmployee(removeConfirm)}
+          onClose={() => setRemoveConfirm(null)}
         />
       )}
 

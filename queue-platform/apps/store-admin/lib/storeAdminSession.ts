@@ -11,4 +11,15 @@ export function markStoreReceptionStarted(): void {
 
 export function clearStoreAdminSession(): void {
   localStorage.removeItem(KEY_RECEPTION);
+  if (typeof window === "undefined") return;
+  try {
+    const remove: string[] = [];
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const k = sessionStorage.key(i);
+      if (k && k.startsWith("sa__actor:")) remove.push(k);
+    }
+    remove.forEach((k) => sessionStorage.removeItem(k));
+  } catch {
+    /* ignore */
+  }
 }

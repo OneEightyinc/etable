@@ -64,6 +64,10 @@ export {
   calculateTier,
   POINT_RULES,
   TIER_BENEFITS,
+  listEmployees,
+  addEmployee,
+  removeEmployee,
+  listOperationLogs,
 } from './db';
 
 export type {
@@ -86,6 +90,9 @@ export type {
   MemberTier,
   PointAction,
   PointHistoryRecord,
+  Employee,
+  Actor,
+  OperationLog,
 } from './db';
 
 // Auth middleware

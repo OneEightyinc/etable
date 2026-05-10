@@ -32,6 +32,10 @@ export {
   redeemReferralApi,
   TIER_THRESHOLDS,
   TIER_BENEFITS,
+  listEmployeesApi,
+  addEmployeeApi,
+  removeEmployeeApi,
+  listOperationLogsApi,
 } from './api-client';
 
 export type {
@@ -44,6 +48,9 @@ export type {
   PointAction,
   PointHistoryEntry,
   CustomerPointsData,
+  EmployeeData,
+  ActorData,
+  OperationLogData,
 } from './api-client';
 
 export {

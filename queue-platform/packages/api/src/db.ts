@@ -34,6 +34,44 @@ export interface Account {
   updatedAt: string;
   /** 未設定の既存データは read 時に自動採番 */
   publicUrlTokens?: Partial<PublicUrlTokens>;
+  /** 軽量 employeeId プロファイル: 店舗共通アカウント配下の担当者一覧 */
+  employees?: Employee[];
+}
+
+/** 店舗の従業員（軽量プロファイル）。Account に紐付く。 */
+export interface Employee {
+  id: string;
+  name: string;
+  createdAt: string;
+}
+
+/** 操作ログの actor 情報。mutation 関数群に optional で渡す。 */
+export type Actor = {
+  employeeId: string;
+  employeeName: string;
+};
+
+/** 操作ログ。クレーム対応や監査のため、誰がいつ何をしたかを記録する。 */
+export interface OperationLog {
+  id: string;
+  storeId: string;
+  entryId?: string;
+  ticketNumber?: number;
+  action:
+    | "CALL"
+    | "RECALL"
+    | "DONE"
+    | "HOLD"
+    | "BACK_TO_WAITING"
+    | "CANCEL"
+    | "POSTPONE_USER"
+    | "POSTPONE_STORE"
+    | "EDIT"
+    | "EMPLOYEE_SELECT";
+  employeeId?: string;
+  employeeName?: string;
+  details?: Record<string, unknown>;
+  createdAt: string;
 }
 
 export interface QueueEntry {
@@ -311,6 +349,8 @@ interface Database {
   menuCategories: MenuCategory[];
   menuItems: MenuItem[];
   orders: Order[];
+  /** 操作ログ（後回し・キャンセル等の actor 記録）。古いものから削除する場合は別途実装。 */
+  operationLogs: OperationLog[];
 }
 
 const REMOTE_DB_KEY = "queue-platform:database:v1";
@@ -444,6 +484,7 @@ function getDefaultDb(): Database {
     menuCategories: [],
     menuItems: [],
     orders: [],
+    operationLogs: [],
   };
 }
 
@@ -473,6 +514,7 @@ function normalizeDatabase(raw: unknown): Database {
     menuCategories: Array.isArray(d.menuCategories) ? (d.menuCategories as MenuCategory[]) : [],
     menuItems: Array.isArray(d.menuItems) ? (d.menuItems as MenuItem[]) : [],
     orders: Array.isArray(d.orders) ? (d.orders as Order[]) : [],
+    operationLogs: Array.isArray(d.operationLogs) ? (d.operationLogs as OperationLog[]) : [],
   };
 }
 
@@ -698,6 +740,74 @@ function bumpTicketNumber(db: Database, storeId: string): number {
   return next;
 }
 
+// ─── Employees & Operation Logs ───────────────────────────
+
+function appendOperationLogInDb(
+  db: Database,
+  storeId: string,
+  action: OperationLog["action"],
+  actor: Actor | undefined,
+  options: { entryId?: string; ticketNumber?: number; details?: Record<string, unknown> } = {}
+): void {
+  if (!db.operationLogs) db.operationLogs = [];
+  db.operationLogs.push({
+    id: crypto.randomUUID(),
+    storeId,
+    entryId: options.entryId,
+    ticketNumber: options.ticketNumber,
+    action,
+    employeeId: actor?.employeeId,
+    employeeName: actor?.employeeName,
+    details: options.details,
+    createdAt: new Date().toISOString(),
+  });
+}
+
+export async function listEmployees(storeId: string): Promise<Employee[]> {
+  const db = await readDatabase();
+  const account = db.accounts.find((a) => a.id === storeId);
+  return Array.isArray(account?.employees) ? [...account!.employees!] : [];
+}
+
+export async function addEmployee(storeId: string, name: string): Promise<Employee> {
+  const trimmed = (name ?? "").trim();
+  if (!trimmed) throw new Error("名前を入力してください");
+  if (trimmed.length > 30) throw new Error("名前は30文字以内で入力してください");
+  const db = await readDatabase();
+  const account = db.accounts.find((a) => a.id === storeId);
+  if (!account) throw new Error("店舗アカウントが見つかりません");
+  if (!Array.isArray(account.employees)) account.employees = [];
+  if (account.employees.some((e) => e.name === trimmed)) {
+    throw new Error("同じ名前の担当者が既に登録されています");
+  }
+  const emp: Employee = {
+    id: crypto.randomUUID(),
+    name: trimmed,
+    createdAt: new Date().toISOString(),
+  };
+  account.employees.push(emp);
+  account.updatedAt = new Date().toISOString();
+  await persistDatabase();
+  return emp;
+}
+
+export async function removeEmployee(storeId: string, employeeId: string): Promise<void> {
+  const db = await readDatabase();
+  const account = db.accounts.find((a) => a.id === storeId);
+  if (!account || !Array.isArray(account.employees)) return;
+  account.employees = account.employees.filter((e) => e.id !== employeeId);
+  account.updatedAt = new Date().toISOString();
+  await persistDatabase();
+}
+
+/** 操作ログを店舗単位で新しい順に最大 limit 件取得。 */
+export async function listOperationLogs(storeId: string, limit = 200): Promise<OperationLog[]> {
+  const db = await readDatabase();
+  const logs = (db.operationLogs ?? []).filter((l) => l.storeId === storeId);
+  logs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  return logs.slice(0, Math.max(0, Math.floor(limit)));
+}
+
 // ─── Queue Management ────────────────────────────────────
 /** 呼び出し→未応答の自動遷移閾値のデフォルト（分）。storeSettings.autoCancelMinutes が未設定/不正の場合に使用。 */
 const DEFAULT_CALLOUT_TIMEOUT_MIN = 5;
@@ -790,22 +900,30 @@ export async function addToQueue(data: {
 
 export async function updateQueueDetails(
   id: string,
-  data: Partial<{ adults: number; children: number; seatType: "TABLE" | "COUNTER" | "EITHER" }>
+  data: Partial<{ adults: number; children: number; seatType: "TABLE" | "COUNTER" | "EITHER" }>,
+  actor?: Actor
 ): Promise<QueueEntry> {
   const db = await readDatabase();
   const entry = db.queue.find((q) => q.id === id);
   if (!entry) throw new Error("順番待ちデータが見つかりません");
+  const before = { adults: entry.adults, children: entry.children, seatType: entry.seatType };
   if (data.adults !== undefined) entry.adults = data.adults;
   if (data.children !== undefined) entry.children = data.children;
   if (data.seatType !== undefined) entry.seatType = data.seatType;
   entry.updatedAt = new Date().toISOString();
+  appendOperationLogInDb(db, entry.storeId, "EDIT", actor, {
+    entryId: entry.id,
+    ticketNumber: entry.ticketNumber,
+    details: { before, after: { adults: entry.adults, children: entry.children, seatType: entry.seatType } },
+  });
   await persistDatabase();
   return entry;
 }
 
 export async function updateQueueStatus(
   id: string,
-  status: "WAITING" | "CALLED" | "HOLD" | "DONE" | "CANCELLED"
+  status: "WAITING" | "CALLED" | "HOLD" | "DONE" | "CANCELLED",
+  actor?: Actor
 ): Promise<QueueEntry> {
   const db = await readDatabase();
   const entry = db.queue.find((q) => q.id === id);
@@ -827,6 +945,24 @@ export async function updateQueueStatus(
     // 通常待機に戻ったので保留理由をクリア
     entry.holdReason = undefined;
   }
+
+  // 操作ログを記録（status 遷移を action にマッピング）
+  const action: OperationLog["action"] | null =
+    status === "CALLED"
+      ? (entry.recallCount ?? 0) >= 2 ? "RECALL" : "CALL"
+      : status === "DONE" ? "DONE"
+      : status === "HOLD" ? "HOLD"
+      : status === "WAITING" && prevStatus === "HOLD" ? "BACK_TO_WAITING"
+      : status === "CANCELLED" ? "CANCEL"
+      : null;
+  if (action) {
+    appendOperationLogInDb(db, entry.storeId, action, actor, {
+      entryId: entry.id,
+      ticketNumber: entry.ticketNumber,
+      details: { from: prevStatus, to: status },
+    });
+  }
+
   await persistDatabase();
 
   // CALLED 遷移時に LINE 通知を best-effort で発火（push 失敗はログだけ残す）
@@ -858,8 +994,10 @@ function consumePostponeSlotsInDb(db: Database, storeId: string): void {
   }
 }
 
-/** ユーザー主導の後回し: status は WAITING のまま、3 組ぶん自分の前に消化されるまで番が回ってこない状態にする。 */
-export async function userPostponeQueueEntry(id: string, slots = 3): Promise<QueueEntry> {
+/** ユーザー主導の後回し: status は WAITING のまま、3 組ぶん自分の前に消化されるまで番が回ってこない状態にする。
+ *  store-admin から actor 付きで呼ばれた場合は POSTPONE_STORE として記録する（顧客本人発の場合は actor なしで POSTPONE_USER）。
+ */
+export async function userPostponeQueueEntry(id: string, slots = 3, actor?: Actor): Promise<QueueEntry> {
   const db = await readDatabase();
   const entry = db.queue.find((q) => q.id === id);
   if (!entry) throw new Error("順番待ちデータが見つかりません");
@@ -868,18 +1006,28 @@ export async function userPostponeQueueEntry(id: string, slots = 3): Promise<Que
   entry.postponeRemainingSlots = slots;
   entry.userPostponedCount = (entry.userPostponedCount ?? 0) + 1;
   entry.updatedAt = new Date().toISOString();
+  appendOperationLogInDb(db, entry.storeId, actor ? "POSTPONE_STORE" : "POSTPONE_USER", actor, {
+    entryId: entry.id,
+    ticketNumber: entry.ticketNumber,
+    details: { slots },
+  });
   await persistDatabase();
   return entry;
 }
 
 /** 不在検知 → 保留状態に遷移。HOLD は店舗主導の不在対応のみで使う。 */
-export async function markNoShowHold(id: string): Promise<QueueEntry> {
+export async function markNoShowHold(id: string, actor?: Actor): Promise<QueueEntry> {
   const db = await readDatabase();
   const entry = db.queue.find((q) => q.id === id);
   if (!entry) throw new Error("順番待ちデータが見つかりません");
   entry.status = "HOLD";
   entry.holdReason = "NO_SHOW";
   entry.updatedAt = new Date().toISOString();
+  appendOperationLogInDb(db, entry.storeId, "HOLD", actor, {
+    entryId: entry.id,
+    ticketNumber: entry.ticketNumber,
+    details: { reason: "NO_SHOW" },
+  });
   await persistDatabase();
   return entry;
 }
@@ -915,12 +1063,18 @@ export async function setQueueNotificationPreferences(
   return entry;
 }
 
-export async function removeFromQueue(id: string): Promise<boolean> {
+export async function removeFromQueue(id: string, actor?: Actor): Promise<boolean> {
   const db = await readDatabase();
   const entry = db.queue.find((q) => q.id === id);
   if (!entry) return false;
+  const prevStatus = entry.status;
   entry.status = "CANCELLED";
   entry.updatedAt = new Date().toISOString();
+  appendOperationLogInDb(db, entry.storeId, "CANCEL", actor, {
+    entryId: entry.id,
+    ticketNumber: entry.ticketNumber,
+    details: { from: prevStatus, to: "CANCELLED" },
+  });
   await persistDatabase();
   return true;
 }

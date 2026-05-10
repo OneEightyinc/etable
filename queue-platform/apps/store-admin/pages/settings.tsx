@@ -38,6 +38,7 @@ interface StoreSettings {
   callMessage: string;
   autoCancelMinutes: number;
   defaultPostponeSlots?: number;
+  notifyAheadSlots?: number;
   showSmallPartyTab?: boolean;
   portalDisplayName?: string;
   portalCategory?: string;
@@ -73,6 +74,7 @@ export default function SettingsPage() {
   const [message, setMessage] = useState('番号 {number} のお客様、ご来店をお願いいたします。');
   const [autoCancelMinutes, setAutoCancelMinutes] = useState(10);
   const [defaultPostponeSlots, setDefaultPostponeSlots] = useState(3);
+  const [notifyAheadSlots, setNotifyAheadSlots] = useState(3);
   const [showSmallPartyTab, setShowSmallPartyTab] = useState(false);
 
   // ポイント倍率設定
@@ -131,6 +133,11 @@ export default function SettingsPage() {
             : 3
         );
         setShowSmallPartyTab(s.showSmallPartyTab === true);
+        setNotifyAheadSlots(
+          typeof s.notifyAheadSlots === 'number'
+            ? Math.min(10, Math.max(1, Math.round(s.notifyAheadSlots)))
+            : 3
+        );
         setPortalDisplayName(s.portalDisplayName ?? '');
         setPortalCategory(s.portalCategory ?? 'レストラン');
         setPortalImageUrl(s.portalImageUrl ?? '');
@@ -232,6 +239,7 @@ export default function SettingsPage() {
           callMessage: message,
           autoCancelMinutes,
           defaultPostponeSlots: Math.min(5, Math.max(2, Math.round(defaultPostponeSlots))),
+          notifyAheadSlots: Math.min(10, Math.max(1, Math.round(notifyAheadSlots))),
           showSmallPartyTab,
           portalDisplayName,
           portalCategory,
@@ -820,6 +828,24 @@ export default function SettingsPage() {
                   className="flex-1 text-sm text-[#082752] bg-transparent outline-none text-center"
                   min="2"
                   max="5"
+                />
+                <span className="text-xs text-gray-400">組</span>
+              </div>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-2 block">事前通知の閾値（1〜10）</label>
+              <p className="text-[11px] text-gray-400 mb-2">LINE 連携済み顧客に対し、自分の前があと N 組以下になった瞬間に「あと N 組です」通知を 1 度送信します。</p>
+              <div className="flex items-center bg-gray-50 rounded-xl border border-gray-200 px-4 py-3">
+                <input
+                  type="number"
+                  value={notifyAheadSlots}
+                  onChange={(e) => {
+                    const n = parseInt(e.target.value) || 3;
+                    setNotifyAheadSlots(Math.min(10, Math.max(1, n)));
+                  }}
+                  className="flex-1 text-sm text-[#082752] bg-transparent outline-none text-center"
+                  min="1"
+                  max="10"
                 />
                 <span className="text-xs text-gray-400">組</span>
               </div>

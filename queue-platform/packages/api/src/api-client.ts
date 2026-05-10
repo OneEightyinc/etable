@@ -287,6 +287,7 @@ export interface StoreSettingsData {
   callMessage: string;
   autoCancelMinutes: number;
   defaultPostponeSlots?: number;
+  notifyAheadSlots?: number;
   showSmallPartyTab?: boolean;
   updatedAt: string;
   portalDisplayName?: string;

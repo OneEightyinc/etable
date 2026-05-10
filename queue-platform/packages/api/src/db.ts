@@ -109,6 +109,8 @@ export interface QueueEntry {
   visitPurpose?: "lunch" | "dinner" | "drinking" | "date" | "work_cafe" | "other";
   /** 受付アンケート: 利用形態 */
   groupType?: "solo" | "friends" | "couple" | "family" | "business";
+  /** 「あと N 組」事前 LINE 通知を発火した時刻。重複送信防止用、エントリごと最大 1 回。 */
+  aheadNotifiedAt?: string;
 }
 
 export interface Session {
@@ -130,6 +132,8 @@ export interface StoreSettings {
   autoCancelMinutes: number;
   /** ユーザーが「後回しにする」を選んだ際の既定スロット数。範囲 2〜5。 */
   defaultPostponeSlots: number;
+  /** 「あと N 組」事前通知の閾値。残 N 組以下になった瞬間に LINE 通知を 1 度発火。範囲 1〜10、デフォルト 3。 */
+  notifyAheadSlots: number;
   updatedAt: string;
   /** 顧客ポータル表示名（空ならアカウントの店舗名） */
   portalDisplayName: string;
@@ -838,6 +842,38 @@ function getActiveQueueForStore(db: Database, storeId: string): QueueEntry[] {
  * 自動で HOLD（1 回目）or CANCELLED（2 回目以降）に遷移させる。
  * getQueueByStore の冒頭で呼び、polling されるたびに自然に整合する設計。
  */
+/**
+ * WAITING エントリのうち、自分より前に並ぶ実待ち組数（CALLED 含まず、
+ * 後回し中エントリは除く）が storeSettings.notifyAheadSlots 以下になり、
+ * かつ aheadNotifiedAt が未設定で LINE 連携済みのものに対し、
+ * 「あと N 組」事前通知を 1 度だけ発火する。
+ */
+function processAheadNotificationsInDb(db: Database, storeId: string): boolean {
+  const settings = db.storeSettings?.find((s) => s.storeId === storeId);
+  const threshold = typeof settings?.notifyAheadSlots === "number" && settings.notifyAheadSlots > 0
+    ? settings.notifyAheadSlots
+    : 3;
+  const waiting = db.queue
+    .filter((e) => e.storeId === storeId && e.status === "WAITING" && !((e.postponeRemainingSlots ?? 0) > 0))
+    .sort((a, b) => new Date(a.arrivalTime).getTime() - new Date(b.arrivalTime).getTime());
+  let changed = false;
+  for (let i = 0; i < waiting.length; i++) {
+    const entry = waiting[i];
+    if (i > threshold) break;
+    if (entry.aheadNotifiedAt) continue;
+    if (!entry.notificationLine || !entry.lineUserId) continue;
+    const ahead = i;
+    if (ahead > threshold) continue;
+    entry.aheadNotifiedAt = new Date().toISOString();
+    changed = true;
+    const text = ahead === 0
+      ? "まもなくお呼び出しです。お席の準備を整えてお待ちください。"
+      : `あと ${ahead} 組でお呼び出しです。お近くでお待ちください。`;
+    void pushLineMessage(entry.lineUserId, [{ type: "text", text }]);
+  }
+  return changed;
+}
+
 function processStaleCalloutsInDb(db: Database, storeId: string): boolean {
   const now = Date.now();
   const timeoutMs = getCalloutTimeoutMs(db, storeId);
@@ -862,7 +898,9 @@ function processStaleCalloutsInDb(db: Database, storeId: string): boolean {
 
 export async function getQueueByStore(storeId: string): Promise<QueueEntry[]> {
   const db = await readDatabase();
-  if (processStaleCalloutsInDb(db, storeId)) {
+  const stale = processStaleCalloutsInDb(db, storeId);
+  const ahead = processAheadNotificationsInDb(db, storeId);
+  if (stale || ahead) {
     await persistDatabase();
   }
   return getActiveQueueForStore(db, storeId);
@@ -1183,6 +1221,7 @@ function getDefaultStoreSettings(storeId: string): StoreSettings {
     callMessage: "番号 {number} のお客様、ご来店をお願いいたします。",
     autoCancelMinutes: 5,
     defaultPostponeSlots: 3,
+    notifyAheadSlots: 3,
     showSmallPartyTab: false,
     updatedAt: new Date().toISOString(),
     portalDisplayName: "",
@@ -1216,6 +1255,9 @@ function normalizeStoreSettings(raw: StoreSettings): StoreSettings {
     defaultPostponeSlots: typeof raw.defaultPostponeSlots === "number" && Number.isFinite(raw.defaultPostponeSlots)
       ? Math.min(5, Math.max(2, Math.round(raw.defaultPostponeSlots)))
       : d.defaultPostponeSlots,
+    notifyAheadSlots: typeof raw.notifyAheadSlots === "number" && Number.isFinite(raw.notifyAheadSlots)
+      ? Math.min(10, Math.max(1, Math.round(raw.notifyAheadSlots)))
+      : d.notifyAheadSlots,
   };
 }
 

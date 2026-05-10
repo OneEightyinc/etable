@@ -60,6 +60,7 @@ export {
   resolvePublicUrlToken,
   addPoints,
   getPointHistory,
+  getUsablePoints,
   findCustomerByReferralCode,
   calculateTier,
   POINT_RULES,

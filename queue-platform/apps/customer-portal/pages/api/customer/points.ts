@@ -3,6 +3,7 @@ import {
   getCustomerProfileById,
   addPoints,
   getPointHistory,
+  getUsablePoints,
   POINT_RULES,
   getCustomerIdFromRequest,
 } from "@queue-platform/api/src/server";
@@ -20,8 +21,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(404).json({ error: "顧客が見つかりません" });
     }
     const history = await getPointHistory(customerId);
+    const { usablePoints, pendingPoints } = await getUsablePoints(customerId);
     return res.status(200).json({
       totalPoints: profile.totalPoints ?? 0,
+      usablePoints,
+      pendingPoints,
       currentTier: profile.currentTier ?? "BRONZE",
       referralCode: profile.referralCode ?? "",
       history,

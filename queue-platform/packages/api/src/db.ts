@@ -197,6 +197,8 @@ export interface PointHistoryRecord {
   points: number;
   description: string;
   createdAt: string;
+  /** 使用可能になる時刻（付与時刻 +24h）。未設定の旧レコードは createdAt+24h で読み取る。 */
+  availableFrom?: string;
 }
 
 /** アクション別の基本付与ポイント */
@@ -1538,13 +1540,15 @@ export async function addPoints(
   const profile = (db.customerProfiles ?? []).find((c) => c.id === customerId);
   if (!profile) throw new Error("顧客が見つかりません");
 
+  const createdAt = new Date();
   const record: PointHistoryRecord = {
     id: crypto.randomUUID(),
     customerId,
     action,
     points,
     description,
-    createdAt: new Date().toISOString(),
+    createdAt: createdAt.toISOString(),
+    availableFrom: new Date(createdAt.getTime() + 24 * 60 * 60 * 1000).toISOString(),
   };
   db.pointHistory.push(record);
 
@@ -1563,6 +1567,28 @@ export async function getPointHistory(customerId: string): Promise<PointHistoryR
   return (db.pointHistory ?? [])
     .filter((h) => h.customerId === customerId)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+}
+
+/** PointHistoryRecord の使用可能化時刻を返す（旧レコード backfill: createdAt+24h）。 */
+function effectiveAvailableFrom(h: PointHistoryRecord): number {
+  if (h.availableFrom) return new Date(h.availableFrom).getTime();
+  return new Date(h.createdAt).getTime() + 24 * 60 * 60 * 1000;
+}
+
+/** 使用可能ポイント（availableFrom <= now の合計）と使用待ちポイント（pending）を返す。 */
+export async function getUsablePoints(
+  customerId: string
+): Promise<{ usablePoints: number; pendingPoints: number }> {
+  const db = await readDatabase();
+  const now = Date.now();
+  let usable = 0;
+  let pending = 0;
+  for (const h of db.pointHistory ?? []) {
+    if (h.customerId !== customerId) continue;
+    if (effectiveAvailableFrom(h) <= now) usable += h.points;
+    else pending += h.points;
+  }
+  return { usablePoints: usable, pendingPoints: pending };
 }
 
 /** 招待コードから顧客を検索 */

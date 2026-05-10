@@ -72,6 +72,8 @@ const MyPage: React.FC = () => {
     { id: string; name: string; isoDate: string; imageUrl: string }[]
   >([]);
   const [totalPoints, setTotalPoints] = useState(0);
+  const [usablePoints, setUsablePoints] = useState(0);
+  const [pendingPoints, setPendingPoints] = useState(0);
   const [currentTier, setCurrentTier] = useState<MemberTier>("BRONZE");
   const [referralCode, setReferralCode] = useState("");
   const [pointHistory, setPointHistory] = useState<{ id: string; action: string; points: number; description: string; createdAt: string }[]>([]);
@@ -219,6 +221,8 @@ const MyPage: React.FC = () => {
         const data = await res.json();
         if (cancelled) return;
         setTotalPoints(data.totalPoints ?? 0);
+        setUsablePoints(data.usablePoints ?? data.totalPoints ?? 0);
+        setPendingPoints(data.pendingPoints ?? 0);
         setCurrentTier(data.currentTier ?? "BRONZE");
         setReferralCode(data.referralCode ?? "");
         setPointHistory(data.history ?? []);
@@ -504,9 +508,12 @@ const MyPage: React.FC = () => {
                     <div>
                       <p className="text-[10px] opacity-90">AVAILABLE POINTS</p>
                       <p className="text-[32px] font-bold tracking-tight">
-                        {totalPoints.toLocaleString()}
+                        {usablePoints.toLocaleString()}
                         <span className="ml-1 text-[14px] font-medium">pts</span>
                       </p>
+                      {pendingPoints > 0 && (
+                        <p className="mt-0.5 text-[11px] opacity-80">うち翌日有効: {pendingPoints.toLocaleString()}pt</p>
+                      )}
                     </div>
                     {progress.nextLabel && (
                       <div className="text-right">

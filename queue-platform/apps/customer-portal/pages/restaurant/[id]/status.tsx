@@ -604,7 +604,7 @@ const ReservationStatusPage: React.FC = () => {
 
                   {/* ETABLEレビュー自由記述 */}
                   <div className="mt-4 text-left">
-                    <p className="mb-2 text-[13px] font-bold text-[#333]">ETABLEレビューを書く<span className="ml-1 font-normal text-[#999]">任意</span></p>
+                    <p className="mb-2 text-[13px] font-bold text-[#333]">ETABLEレビューを書く</p>
                     <textarea
                       value={reviewFeedback}
                       onChange={(e) => setReviewFeedback(e.target.value)}
@@ -617,9 +617,21 @@ const ReservationStatusPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => void handleReviewSubmit()}
-                    className="mt-3 w-full rounded-full border border-[#e5e5e5] bg-white py-3 text-[13px] font-medium text-[#666]"
+                    disabled={!reviewFeedback.trim() || reviewSubmitting}
+                    className={`mt-3 w-full rounded-full py-3 text-[13px] font-medium ${
+                      reviewFeedback.trim() && !reviewSubmitting
+                        ? "border border-[#e5e5e5] bg-white text-[#666]"
+                        : "border border-[#e5e5e5] bg-[#f5f5f5] text-[#bbb] cursor-not-allowed"
+                    }`}
                   >
-                    {reviewFeedback.trim() ? "レビューを送信して完了" : "スキップ"}
+                    {reviewSubmitting ? "送信中..." : "レビューを送信して完了"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setReviewSubmitted(true)}
+                    className="mt-2 w-full py-2 text-center text-[12px] font-medium text-[#999]"
+                  >
+                    スキップ
                   </button>
                 </div>
               )}

@@ -76,6 +76,7 @@ export default function SettingsPage() {
   const [defaultPostponeSlots, setDefaultPostponeSlots] = useState(3);
   const [notifyAheadSlots, setNotifyAheadSlots] = useState(3);
   const [showSmallPartyTab, setShowSmallPartyTab] = useState(false);
+  const [closingTime, setClosingTime] = useState('');
 
   // ポイント倍率設定
   const [idleTimeEnabled, setIdleTimeEnabled] = useState(false);
@@ -133,6 +134,7 @@ export default function SettingsPage() {
             : 3
         );
         setShowSmallPartyTab(s.showSmallPartyTab === true);
+        setClosingTime(s.closingTime ?? '');
         setNotifyAheadSlots(
           typeof s.notifyAheadSlots === 'number'
             ? Math.min(10, Math.max(1, Math.round(s.notifyAheadSlots)))
@@ -241,6 +243,7 @@ export default function SettingsPage() {
           defaultPostponeSlots: Math.min(5, Math.max(2, Math.round(defaultPostponeSlots))),
           notifyAheadSlots: Math.min(10, Math.max(1, Math.round(notifyAheadSlots))),
           showSmallPartyTab,
+          closingTime: closingTime || undefined,
           portalDisplayName,
           portalCategory,
           portalImageUrl,
@@ -861,6 +864,21 @@ export default function SettingsPage() {
               >
                 <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition ${showSmallPartyTab ? 'translate-x-5' : 'translate-x-1'}`} />
               </button>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-2 block">閉店時刻（自動クリーンアップ）</label>
+              <p className="text-[11px] text-gray-400 mb-2">設定した時刻を過ぎると、残りのアクティブな待ち客を自動的にキャンセルします。空欄で無効。</p>
+              <div className="flex items-center bg-gray-50 rounded-xl border border-gray-200 px-4 py-3">
+                <input
+                  type="time"
+                  value={closingTime}
+                  onChange={(e) => setClosingTime(e.target.value)}
+                  className="flex-1 text-sm text-[#082752] bg-transparent outline-none"
+                />
+                {closingTime && (
+                  <button type="button" onClick={() => setClosingTime('')} className="text-xs text-gray-400 hover:text-gray-600">クリア</button>
+                )}
+              </div>
             </div>
           </div>
         </div>

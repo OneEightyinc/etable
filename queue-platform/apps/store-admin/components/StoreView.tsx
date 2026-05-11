@@ -766,9 +766,19 @@ const StoreView: React.FC<{ storeId?: string; onLogout?: () => void }> = ({
                 <p className="text-xs text-gray-400 tracking-widest mb-3">FINISH DAY</p>
                 {showEndConfirm ? (
                   <div className="bg-[#DC2626] rounded-xl p-4">
-                    <p className="text-white text-sm text-center mb-4">営業を終了し集計画面へ進みます。よろしいですか？</p>
+                    <p className="text-white text-sm text-center mb-4">営業を終了します。残りの待ち客はすべてキャンセルされます。よろしいですか？</p>
                     <div className="flex gap-2">
-                      <button onClick={() => { clearStoreAdminSession(); router.push(storeScopedPath(publicToken, "/summary", storeId)); }} className="flex-1 py-3 bg-white text-[#DC2626] rounded-xl font-medium hover:bg-gray-100 transition-colors">はい</button>
+                      <button onClick={async () => {
+                        try {
+                          await fetch('/api/queue/end-of-day', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ storeId, actor: actorOrUndef }),
+                          });
+                        } catch {}
+                        clearStoreAdminSession();
+                        router.push(storeScopedPath(publicToken, "/summary", storeId));
+                      }} className="flex-1 py-3 bg-white text-[#DC2626] rounded-xl font-medium hover:bg-gray-100 transition-colors">はい</button>
                       <button onClick={() => setShowEndConfirm(false)} className="flex-1 py-3 bg-white/20 text-white rounded-xl font-medium hover:bg-white/30 transition-colors">キャンセル</button>
                     </div>
                   </div>

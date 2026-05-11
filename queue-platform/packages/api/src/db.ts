@@ -161,6 +161,8 @@ export interface StoreSettings {
   };
   /** 「1〜2 名」タブを店舗ビューに追加表示するか（小人数の素早い案内動線用） */
   showSmallPartyTab?: boolean;
+  /** 閉店時刻（HH:MM 形式）。この時刻を過ぎるとアクティブなエントリを自動キャンセル */
+  closingTime?: string;
 }
 
 /** 顧客ポータル会員（DB 永続化） */
@@ -902,7 +904,8 @@ export async function getQueueByStore(storeId: string): Promise<QueueEntry[]> {
   const db = await readDatabase();
   const stale = processStaleCalloutsInDb(db, storeId);
   const ahead = processAheadNotificationsInDb(db, storeId);
-  if (stale || ahead) {
+  const closing = processClosingTimeInDb(db, storeId);
+  if (stale || ahead || closing) {
     await persistDatabase();
   }
   return getActiveQueueForStore(db, storeId);
@@ -1128,6 +1131,54 @@ export async function removeFromQueue(id: string, actor?: Actor): Promise<boolea
   });
   await persistDatabase();
   return true;
+}
+
+/** 営業終了: 店舗のアクティブなエントリをすべてキャンセルし、件数を返す。 */
+export async function endOfDayCleanup(storeId: string, actor?: Actor): Promise<number> {
+  const db = await readDatabase();
+  let count = 0;
+  for (const e of db.queue) {
+    if (e.storeId !== storeId) continue;
+    if (["DONE", "CANCELLED"].includes(e.status)) continue;
+    const prevStatus = e.status;
+    e.status = "CANCELLED";
+    e.updatedAt = new Date().toISOString();
+    appendOperationLogInDb(db, storeId, "CANCEL", actor, {
+      entryId: e.id,
+      ticketNumber: e.ticketNumber,
+      details: { from: prevStatus, to: "CANCELLED", reason: "END_OF_DAY" },
+    });
+    count++;
+  }
+  if (count > 0) await persistDatabase();
+  return count;
+}
+
+/** 閉店時刻の自動クリーンアップ。polling のたびに呼ばれ、closingTime を過ぎていればアクティブエントリを一括キャンセル。 */
+function processClosingTimeInDb(db: Database, storeId: string): boolean {
+  const settings = db.storeSettings?.find((s) => s.storeId === storeId);
+  if (!settings?.closingTime) return false;
+  const [h, m] = settings.closingTime.split(":").map(Number);
+  if (isNaN(h) || isNaN(m)) return false;
+  const now = new Date();
+  const jstOffset = 9 * 60;
+  const jstMinutes = now.getUTCHours() * 60 + now.getUTCMinutes() + jstOffset;
+  const closingMinutes = h * 60 + m;
+  if ((jstMinutes % 1440) < closingMinutes) return false;
+  let changed = false;
+  for (const e of db.queue) {
+    if (e.storeId !== storeId) continue;
+    if (["DONE", "CANCELLED"].includes(e.status)) continue;
+    e.status = "CANCELLED";
+    e.updatedAt = now.toISOString();
+    appendOperationLogInDb(db, storeId, "CANCEL", undefined, {
+      entryId: e.id,
+      ticketNumber: e.ticketNumber,
+      details: { from: e.status, to: "CANCELLED", reason: "CLOSING_TIME" },
+    });
+    changed = true;
+  }
+  return changed;
 }
 
 export async function getQueueEntryById(id: string): Promise<QueueEntry | undefined> {

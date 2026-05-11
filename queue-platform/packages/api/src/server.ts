@@ -20,6 +20,7 @@ export {
   addToQueue,
   updateQueueStatus,
   removeFromQueue,
+  endOfDayCleanup,
   getQueueEntryById,
   getQueuePosition,
   getQueueStats,

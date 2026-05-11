@@ -20,7 +20,7 @@ import { useEmployee } from '../lib/EmployeeContext';
 import EmployeeSelectModal from './EmployeeSelectModal';
 
 /* ─── helpers ─── */
-type FilterTab = 'all' | 'hold-postpone' | 'table' | 'counter' | 'small-party';
+type FilterTab = 'all' | 'hold' | 'table' | 'counter' | 'small-party';
 
 function getSeatLabel(s: string) {
   if (s === 'TABLE') return 'テーブル';
@@ -184,7 +184,7 @@ const StoreView: React.FC<{ storeId?: string; onLogout?: () => void }> = ({
   const holdOrPostponed = [...holdGuests, ...postponedGuests];
 
   const filteredGuests = (() => {
-    if (filterTab === 'hold-postpone') return holdOrPostponed;
+    if (filterTab === 'hold') return holdGuests;
     // 「すべて」「テーブル」「カウンター」「1〜2 名」では HOLD は除外（保留・後回しタブ専用）
     const base = activeGuests.filter(c => c.status !== 'HOLD');
     const filtered = base.filter(c => {
@@ -463,7 +463,7 @@ const StoreView: React.FC<{ storeId?: string; onLogout?: () => void }> = ({
         <div className="flex">
           {(([
             ['all','すべて'],
-            ['hold-postpone','保留・後回し'],
+            ['hold','保留'],
             ['table','テーブル'],
             ['counter','カウンター'],
             ...(showSmallPartyTab ? [['small-party','1〜2 名'] as [FilterTab,string]] : []),
@@ -638,12 +638,12 @@ const StoreView: React.FC<{ storeId?: string; onLogout?: () => void }> = ({
       </div>
 
       {/* ─── HOLD/POSTPONE SECTION (すべて系タブ時のみサマリ表示) ─── */}
-      {holdOrPostponed.length > 0 && filterTab !== 'hold-postpone' && (
+      {holdGuests.length > 0 && filterTab !== 'hold' && (
         <div className="px-4 py-4 bg-[#F5F5F7]">
           <div className="flex items-center gap-3 mb-4">
-            <span className="text-sm text-gray-500 whitespace-nowrap">保留・後回し：{holdOrPostponed.length}名</span>
+            <span className="text-sm text-gray-500 whitespace-nowrap">保留：{holdGuests.length}名</span>
             <div className="flex-1 h-px bg-gray-200" />
-            <button onClick={() => setFilterTab('hold-postpone')} className="text-xs text-[#FD780F] font-medium">すべて表示</button>
+            <button onClick={() => setFilterTab('hold')} className="text-xs text-[#FD780F] font-medium">すべて表示</button>
           </div>
         </div>
       )}

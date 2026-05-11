@@ -537,7 +537,7 @@ const StoreView: React.FC<{ storeId?: string; onLogout?: () => void }> = ({
                       {openMenuId === guest.id && (
                         <>
                           <div className="fixed inset-0 z-[100]" onClick={() => setOpenMenuId(null)} />
-                          <div className="absolute top-10 right-0 z-[110] bg-white rounded-2xl shadow-2xl border border-gray-100 py-2 min-w-[200px]">
+                          <div className="fixed left-1/2 -translate-x-1/2 z-[110] bg-white rounded-2xl shadow-2xl border border-gray-100 py-2 w-[calc(100%-48px)] max-w-[360px]" style={{ top: 'auto', bottom: '40%' }}>
                             {menuItems(guest).map((item, i) => (
                               <button key={i} onClick={() => handleMenuAction(item.action, guest.id, guest)}
                                 className={`w-full flex items-center gap-3 px-4 py-3.5 transition-colors ${item.danger ? 'hover:bg-red-50' : 'hover:bg-gray-50'}`}>

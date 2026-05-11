@@ -187,12 +187,17 @@ const StoreView: React.FC<{ storeId?: string; onLogout?: () => void }> = ({
     if (filterTab === 'hold-postpone') return holdOrPostponed;
     // 「すべて」「テーブル」「カウンター」「1〜2 名」では HOLD は除外（保留・後回しタブ専用）
     const base = activeGuests.filter(c => c.status !== 'HOLD');
-    return base.filter(c => {
+    const filtered = base.filter(c => {
       if (filterTab === 'table') return c.seatType === 'TABLE';
       if (filterTab === 'counter') return c.seatType === 'COUNTER';
       if (filterTab === 'small-party') return (c.adults + c.children) <= 2;
       return true;
     });
+    // 後回しエントリを postponeRemainingSlots 分だけ後ろにずらして表示
+    // 元の並び順（arrivalTime 順）のインデックスに postponeRemainingSlots を足した値でソート
+    return filtered.map((c, i) => ({ c, virtualIdx: i + (c.postponeRemainingSlots ?? 0) }))
+      .sort((a, b) => a.virtualIdx - b.virtualIdx || new Date(a.c.arrivalTime).getTime() - new Date(b.c.arrivalTime).getTime())
+      .map(x => x.c);
   })();
 
   const estWait = (waitingGuests.length * 5) + waitTimeOffset;
@@ -407,16 +412,13 @@ const StoreView: React.FC<{ storeId?: string; onLogout?: () => void }> = ({
     }
     if (guest.status === 'WAITING') {
       items.push({ icon: 'postpone', label: '後回しにする（3組後退）', action: 'postpone' });
-      items.push({ icon: 'edit', label: '人数・席種を変更', action: 'editDetails' });
-      items.push({ icon: 'x', label: 'キャンセル', action: 'cancel', danger: true });
     }
     if (guest.status === 'CALLED') {
       items.push({ icon: 'timer', label: 'タイマーを延長する', action: 'extend' });
-      items.push({ icon: 'x', label: 'キャンセル', action: 'cancel', danger: true });
     }
-    if (guest.status === 'HOLD') {
-      items.push({ icon: 'x', label: 'キャンセル', action: 'cancel', danger: true });
-    }
+    // 編集・キャンセルは全ステータス共通
+    items.push({ icon: 'edit', label: '人数・席種を変更', action: 'editDetails' });
+    items.push({ icon: 'x', label: 'キャンセル', action: 'cancel', danger: true });
     return items;
   };
 

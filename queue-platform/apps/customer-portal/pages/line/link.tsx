@@ -24,15 +24,9 @@ export default function LineLinkPage() {
 
     (async () => {
       const liffId = process.env.NEXT_PUBLIC_LIFF_ID;
-      const entryId = typeof router.query.entryId === "string" ? router.query.entryId : "";
 
       if (!liffId) {
         setErrorMessage("LIFF ID が設定されていません。管理者にご連絡ください。");
-        setStatus("error");
-        return;
-      }
-      if (!entryId) {
-        setErrorMessage("受付情報が見つかりません。順番待ちページから再度お試しください。");
         setStatus("error");
         return;
       }
@@ -41,10 +35,36 @@ export default function LineLinkPage() {
         const liff = (await import("@line/liff")).default;
         await liff.init({ liffId });
         if (!liff.isLoggedIn()) {
-          // 戻り先 URL を保ちつつログイン
           liff.login({ redirectUri: window.location.href });
           return;
         }
+
+        // LIFF リダイレクト後は entryId が router.query / liff.state / URL hash 等に分散するためすべてから探す
+        let entryId = typeof router.query.entryId === "string" ? router.query.entryId : "";
+        if (!entryId) {
+          // liff.state にエンコードされたクエリから取得
+          const liffState = typeof router.query["liff.state"] === "string" ? router.query["liff.state"] : "";
+          if (liffState) {
+            try {
+              const stateParams = new URLSearchParams(liffState.replace(/^[?/]/, ""));
+              entryId = stateParams.get("entryId") ?? "";
+            } catch {}
+          }
+        }
+        if (!entryId) {
+          // フォールバック: 現在の URL 全体からパース
+          try {
+            const fullUrl = new URL(window.location.href);
+            entryId = fullUrl.searchParams.get("entryId") ?? "";
+          } catch {}
+        }
+
+        if (!entryId) {
+          setErrorMessage("受付情報が見つかりません。順番待ちページから再度お試しください。");
+          setStatus("error");
+          return;
+        }
+
         const profile = await liff.getProfile();
         if (cancelled) return;
         setStatus("linking");

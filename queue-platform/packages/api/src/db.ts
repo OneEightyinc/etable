@@ -8,6 +8,7 @@ import crypto from "crypto";
 import { Redis } from "@upstash/redis";
 import { waitingIndexForEntry, waitingLineEntries } from "./queue-waiting-line";
 import { pushLineMessage, formatCallMessage } from "./line";
+import { sendEmail, formatCallEmail } from "./email";
 
 // ─── Types ───────────────────────────────────────────────
 export interface AdminUser {
@@ -1019,12 +1020,19 @@ export async function updateQueueStatus(
 
   await persistDatabase();
 
-  // CALLED 遷移時に LINE 通知を best-effort で発火（push 失敗はログだけ残す）
-  if (status === "CALLED" && entry.notificationLine && entry.lineUserId) {
+  // CALLED 遷移時に通知を best-effort で発火（失敗はログだけ残す）
+  if (status === "CALLED") {
     const settings = db.storeSettings?.find((s) => s.storeId === entry.storeId);
-    const template = settings?.callMessage ?? "";
-    const text = formatCallMessage(template, entry.ticketNumber);
-    void pushLineMessage(entry.lineUserId, [{ type: "text", text }]);
+    if (entry.notificationLine && entry.lineUserId) {
+      const template = settings?.callMessage ?? "";
+      const text = formatCallMessage(template, entry.ticketNumber);
+      void pushLineMessage(entry.lineUserId, [{ type: "text", text }]);
+    }
+    if (entry.notificationEmail && entry.email) {
+      const storeName = settings?.portalDisplayName || undefined;
+      const { subject, html } = formatCallEmail(entry.ticketNumber, storeName);
+      void sendEmail(entry.email, subject, html);
+    }
   }
 
   return entry;

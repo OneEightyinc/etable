@@ -758,7 +758,7 @@ const ReservationStatusPage: React.FC = () => {
             placeholder="example@mail.com"
             value={emailInput}
             onChange={(e) => setEmailInput(e.target.value)}
-            className="mt-3 w-full rounded-[16px] border border-[#eee] px-4 py-3 text-[16px] placeholder:text-[#b6b6b6]"
+            className="mt-3 w-full rounded-[16px] border border-[#eee] bg-white px-4 py-3 text-[16px] text-[#082752] placeholder:text-[#b6b6b6]"
           />
         </Modal>
       )}
